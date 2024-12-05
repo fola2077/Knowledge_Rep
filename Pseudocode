@@ -1,0 +1,42 @@
+class State:
+    def __init__(self, position, battery, visibility):
+        self.position = position  # (x, y, z)
+        self.battery = battery    # Battery level
+        self.visibility = visibility  # Visibility level
+class Action:
+    def __init__(self, move, altitude_adjust, sensor_switch):
+        self.move = move  # (dx, dy, dz)
+        self.altitude_adjust = altitude_adjust  # Change in z
+        self.sensor_switch = sensor_switch  # Boolean
+def reward(state, action):
+    detect_prob = calculate_detection_probability(state.visibility)
+    energy_cost = calculate_energy_cost(action)
+    time_cost = calculate_time_cost(action)
+    return alpha * detect_prob - beta * energy_cost - gamma * time_cost
+def transition(state, action, exo_info):
+    new_position = (
+        state.position[0] + action.move[0],
+        state.position[1] + action.move[1],
+        state.position[2] + action.altitude_adjust
+    )
+    new_battery = state.battery - energy_cost(action)
+    new_visibility = update_visibility(state.visibility, exo_info.weather)
+    return State(new_position, new_battery, new_visibility)
+def policy(state):
+    if state.visibility < threshold:
+        return Action(move=(0, 0, 0), altitude_adjust=10, sensor_switch=True)
+    else:
+        return Action(move=(1, 0, 0), altitude_adjust=0, sensor_switch=False)
+for episode in range(max_episodes):
+    state = initialize_environment()
+    total_reward = 0
+
+    while not is_terminal(state):
+        action = policy(state)
+        exo_info = get_exogenous_info()
+        new_state = transition(state, action, exo_info)
+        reward_value = reward(state, action)
+        total_reward += reward_value
+        state = new_state
+
+    print(f"Episode {episode}: Total Reward = {total_reward}")
