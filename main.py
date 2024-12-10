@@ -1,8 +1,7 @@
 import pygame
-import random 
+import random
 import math
 import time
-import noise # For Perlin noise generation
 
 # Initialize Pygame
 pygame.init()
@@ -10,150 +9,224 @@ pygame.init()
 # Screen Dimensions
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Weather Simulation with Day/Night Cycles")
+pygame.display.set_caption("Probabilistic Weather System - Niger Delta")
 
 # Clock for controlling the frame rate
 clock = pygame.time.Clock()
 
 # Colors
-DAY_COLOR = (135, 206, 235)  # Sky Blue
-NIGHT_COLOR = (25, 25, 112)  # Dark Blue
-RAIN_COLOR = (0, 0, 255)  # Blue for raindrops
-CLOUD_COLOR = (200, 200, 200)  # Light Grey for clouds
-SUN_COLOR = (255, 223, 0)  # Yellow for sun
-MOON_COLOR = (255, 255, 224)  # Light yellow for moon
+DAY_COLOR = (135, 206, 235)
+NIGHT_COLOR = (25, 25, 112)
+CLOUD_COLOR = (200, 200, 200)
+RAIN_COLOR = (0, 0, 255)
+FOG_COLOR = (180, 180, 180, 100)
+HAZE_COLOR = (210, 180, 140, 70)
+
+# Helper Function: Draw Text
+def draw_text(surface, text, font, color, x, y):
+    """Draw text on a surface."""
+    rendered_text = font.render(text, True, color)
+    surface.blit(rendered_text, (x, y))
 
 
-class MultiAgentDrone:
-    None
+class WeatherSystem:
+    def __init__(self, season="rainy"):
+        # Time and Season
+        self.season = season
+        self.hour = 6  # 6 AM start
+        self.minute = 0
+        self.time_of_day = "day"  # 'day', 'night'
+        self.cycle_duration = 24  # 24-hour simulation
+        self.last_update_time = time.time()
 
-class Environment:
+        # Weather Attributes
+        self.weather_condition = "sunny"
+        self.dynamic_condition = None
+        self.temperature = 27  # Default to a warm average
+        self.humidity = 85  # High humidity typical of the Niger Delta
+        self.wind_speed = random.uniform(1, 5)  # m/s
+        self.wind_direction_angle = random.uniform(0, 360)
+        self.precipitation = 0  # mm/hour
+        self.weather_intensity = 0.1  # Scales effects, 0.1 (mild) to 1.0 (severe)
 
-    None
-
-# Weather Class
-class Weather:
-    def __init__(self):
-        # Time attributes
-        self.time_of_day = "day"  # Options: "day", "night"
-        self.cycle_duration = 15  # Duration of day/night in seconds
-        self.current_time = 0
-
-        # Weather attributes
-        self.weather_condition = "sunny"  # Options: "sunny", "rainy", "cloudy"
-        self.background_color = DAY_COLOR
+        # Weather Transition Timers
+        self.weather_change_interval = 20  # Seconds
+        self.last_weather_change = time.time()
 
         # Effects
+        self.clouds = [self.create_cloud() for _ in range(random.randint(5, 15))]
         self.raindrops = []
-        self.clouds = [pygame.Vector2(random.randint(0, WIDTH), random.randint(50, 150)) for _ in range(8)]
 
-        # Transition
-        self.transition_color = list(DAY_COLOR)  # Used for smooth transitions
+    def create_cloud(self):
+        """Create a cloud with random properties."""
+        return {
+            "position": pygame.Vector2(random.randint(0, WIDTH), random.randint(50, 150)),
+            "size": random.uniform(80, 150),
+            "speed": random.uniform(0.5, 2.0),
+        }
 
-    def toggle_time_of_day(self):
-        """Switch between day and night."""
-        if self.time_of_day == "day":
-            self.time_of_day = "night"
-            self.background_color = NIGHT_COLOR
+    def update_time(self, dt):
+        """Simulate the progression of time."""
+        self.minute += dt * 10  # Accelerate time for simulation purposes
+        if self.minute >= 60:
+            self.minute = 0
+            self.hour += 1
+        if self.hour >= 24:
+            self.hour = 0
+            self.change_season()
+
+        # Update time of day
+        self.time_of_day = "day" if 6 <= self.hour < 18 else "night"
+
+
+    def change_season(self):
+        """Change the season based on time or a defined rule."""
+        if self.season == "rainy":
+            self.season = "dry"
+            print("Season changed to Dry Season.")
         else:
-            self.time_of_day = "day"
-            self.background_color = DAY_COLOR
+            self.season = "rainy"
+            print("Season changed to Rainy Season.")
+        self.adjust_for_season()
 
-    def update_cycle(self, dt):
-        """Update time of day and smooth transition."""
-        self.current_time += dt
-        if self.current_time >= self.cycle_duration:
-            self.current_time = 0
-            self.toggle_time_of_day()
+    def adjust_for_season(self):
+        """Adjust weather attributes based on the current season."""
+        if self.season == "rainy":
+            self.temperature = random.uniform(25, 32)
+            self.humidity = random.randint(80, 95)
+            self.precipitation_probability = random.uniform(0.7, 0.9)
+        elif self.season == "dry":
+            self.temperature = random.uniform(21, 30)
+            self.humidity = random.randint(40, 60)
+            self.precipitation_probability = random.uniform(0.1, 0.2)
 
-        # Smooth color transition
-        target_color = NIGHT_COLOR if self.time_of_day == "night" else DAY_COLOR
-        for i in range(3):
-            if self.transition_color[i] < target_color[i]:
-                self.transition_color[i] += 1
-            elif self.transition_color[i] > target_color[i]:
-                self.transition_color[i] -= 1
-        self.background_color = tuple(self.transition_color)
+    def update_weather(self):
+        """Update weather condition probabilistically."""
+        current_time = time.time()
+        if current_time - self.last_weather_change >= self.weather_change_interval:
+            self.last_weather_change = current_time
 
-    def change_weather(self):
-        """Randomly change the weather condition."""
-        self.weather_condition = random.choice(["sunny", "rainy", "cloudy"])
+            # Determine the weather condition based on probabilities
+            if self.season == "rainy":
+                probabilities = {
+                    "sunny": 0.2,
+                    "rainy": 0.5,
+                    "foggy": 0.1,
+                    "windy": 0.2,
+                }
+            else:  # Dry season
+                probabilities = {
+                    "sunny": 0.5,
+                    "rainy": 0.1,
+                    "foggy": 0.1,
+                    "windy": 0.3,
+                }
+
+            self.weather_condition = self.weighted_choice(probabilities)
+            self.dynamic_condition = self.determine_dynamic_condition()
+
+            # Adjust intensity and temperature
+            self.weather_intensity = random.uniform(0.1, 1.0)
+            self.adjust_temperature_and_humidity()
+
+    def weighted_choice(self, probabilities):
+        """Select a weather condition based on probabilities."""
+        total = sum(probabilities.values())
+        rand = random.uniform(0, total)
+        cumulative = 0
+        for condition, prob in probabilities.items():
+            cumulative += prob
+            if rand <= cumulative:
+                return condition
+
+    def determine_dynamic_condition(self):
+        """Determine secondary dynamic weather conditions."""
+        if self.weather_condition == "rainy" and random.random() < 0.3:
+            return "heavystorms"
+        elif self.weather_condition == "rainy" and random.random() < 0.5:
+            return "rain + foggy"
+        elif self.weather_condition == "sunny" and random.random() < 0.2:
+            return "sunny + windy"
+        elif self.season == "dry" and random.random() < 0.3:
+            return "harmattan"
+        return None
+
+    def adjust_temperature_and_humidity(self):
+        """Adjust temperature and humidity based on conditions."""
         if self.weather_condition == "rainy":
-            self.raindrops = [pygame.Vector2(random.randint(0, WIDTH), random.randint(0, HEIGHT)) for _ in range(100)]
-        elif self.weather_condition == "cloudy":
-            self.clouds = [pygame.Vector2(random.randint(0, WIDTH), random.randint(50, 150)) for _ in range(5)]
-        else:
-            self.raindrops = []
-            self.clouds = []
+            self.temperature -= random.uniform(1, 3)
+            self.humidity = random.randint(80, 95)
+        elif self.weather_condition == "sunny":
+            self.temperature += random.uniform(1, 4)
+            self.humidity = random.randint(40, 60)
+        elif self.weather_condition == "foggy":
+            self.temperature -= random.uniform(0.5, 1.5)
+            self.humidity = random.randint(90, 100)
 
-    def draw(self, screen):
-        """Render the current weather."""
-        # Draw the sun or moon
-        if self.time_of_day == "day":
-            pygame.draw.circle(screen, SUN_COLOR, (WIDTH - 100, 100), 50)
-        else:
-            pygame.draw.circle(screen, MOON_COLOR, (WIDTH - 100, 100), 50)
+    def draw_weather(self, screen):
+        """Visualize weather effects."""
+        # Background
+        bg_color = DAY_COLOR if self.time_of_day == "day" else NIGHT_COLOR
+        screen.fill(bg_color)
 
-        # Draw clouds
-        if self.weather_condition == "cloudy":
-            for cloud in self.clouds:
-                pygame.draw.ellipse(screen, CLOUD_COLOR, (cloud.x, cloud.y, 120, 60))
+        # Clouds
+        for cloud in self.clouds:
+            pygame.draw.ellipse(
+                screen, CLOUD_COLOR, (cloud["position"].x, cloud["position"].y, cloud["size"], cloud["size"] // 2)
+            )
+            cloud["position"].x += cloud["speed"]
+            if cloud["position"].x > WIDTH:
+                cloud["position"].x = -cloud["size"]
 
-        # Draw raindrops
-        if self.weather_condition == "rainy":
+        # Raindrops
+        if self.weather_condition in ["rainy", "heavystorms"]:
             for drop in self.raindrops:
                 pygame.draw.line(screen, RAIN_COLOR, (drop.x, drop.y), (drop.x, drop.y + 10), 2)
 
-    def update_weather_effects(self):
-        """Update raindrop positions."""
-        if self.weather_condition == "rainy":
-            for drop in self.raindrops:
-                drop.y += 5  # Raindrop speed
-                if drop.y > HEIGHT:
-                    drop.y = random.randint(-20, -1)
-                    drop.x = random.randint(0, WIDTH)
+    def get_stats(self):
+        """Return current weather stats."""
+        return {
+            "Time of Day": self.time_of_day.capitalize(),
+            "Weather": self.weather_condition.capitalize(),
+            "Dynamic Condition": self.dynamic_condition or "None",
+            "Temperature": f"{self.temperature:.1f} °C",
+            "Humidity": f"{self.humidity}%",
+            "Wind Speed": f"{self.wind_speed:.1f} m/s",
+            "Wind Direction": f"{self.wind_direction_angle:.1f}°",
+        }
 
 
-        # Update cloud movement
-        if self.weather_condition in ["cloudy", "rainy"]:
-            for cloud in self.clouds:
-                cloud.x += 0.5
-                if cloud.x > WIDTH + 100:
-                    cloud.x = -200
+# Initialize the weather system
+weather = WeatherSystem(season="rainy")
+font = pygame.font.Font(None, 36)
 
-# Initialize the Weather object
-weather = Weather()
-
-# Main Game Loop
+# Main Loop
 running = True
 last_update_time = time.time()
-weather.change_weather()  # Set initial weather
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    # Get delta time for smooth updates
+    # Time and delta updates
     current_time = time.time()
     dt = current_time - last_update_time
     last_update_time = current_time
 
-    # Update weather cycle and effects
-    weather.update_cycle(dt)
-    weather.update_weather_effects()
+    # Update system
+    weather.update_time(dt)
+    weather.update_weather()
 
-    # Periodically change weather
-    if random.randint(0, 300) == 0:  # Random chance to change weather
-        weather.change_weather()
+    # Draw weather and stats
+    weather.draw_weather(screen)
+    stats = weather.get_stats()
+    y_offset = 10
+    for key, value in stats.items():
+        draw_text(screen, f"{key}: {value}", font, (255, 255, 255), 10, y_offset)
+        y_offset += 30
 
-    # Draw everything
-    screen.fill(weather.background_color)
-    weather.draw(screen)
-
-    # Refresh screen
     pygame.display.flip()
     clock.tick(60)
 
 pygame.quit()
-
