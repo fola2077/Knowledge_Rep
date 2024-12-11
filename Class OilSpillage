@@ -1,0 +1,45 @@
+import pybullet as p
+import numpy as np
+
+class OilSpillage:
+    def __init__(self, position, detection_radius=0.5):
+        """
+        Represents an oil spillage in the environment.
+
+        :param position: Tuple (x, y) for the spillage location.
+        :param detection_radius: Radius within which drones can detect the spillage.
+        """
+        self.position = np.array(position)  # Spillage location as a NumPy array
+        self.detected = False  # Whether the spillage has been detected
+        self.detection_radius = detection_radius
+        self.visual_id = None  # PyBullet object ID for visualization
+
+    def add_to_simulation(self):
+        """
+        Adds the spillage to the PyBullet simulation as a sphere.
+        """
+        self.visual_id = p.loadURDF(
+            "sphere2.urdf", 
+            [self.position[0], self.position[1], 0.1],  # Slightly above ground
+            globalScaling=0.5  # Make the sphere small to represent a spillage
+        )
+
+    def check_detection(self, drone_position):
+        """
+        Checks if a drone has detected the spillage.
+
+        :param drone_position: Position of the drone as a NumPy array (x, y).
+        :return: True if detected, False otherwise.
+        """
+        if not self.detected:
+            distance = np.linalg.norm(self.position - drone_position)
+            if distance <= self.detection_radius:
+                self.detected = True  # Mark the spillage as detected
+                return True
+        return False
+
+    def reset(self):
+        """
+        Resets the spillage detection status.
+        """
+        self.detected = False
