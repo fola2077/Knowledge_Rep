@@ -1,144 +1,160 @@
 import pygame
 import random
+import math
 import time
+import numpy as np
 
-# Initialize Pygame
+# Initialize pygame
 pygame.init()
 
-# Main Window Dimensions
+# Screen dimensions
 WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Weather Simulation")
-
-# Stats Window Dimensions
-STATS_WIDTH, STATS_HEIGHT = 300, 200
-stats_screen = pygame.display.set_mode((STATS_WIDTH, STATS_HEIGHT), pygame.RESIZABLE)
-pygame.display.set_caption("Weather Stats")
-
-# Clock for controlling the frame rate
-clock = pygame.time.Clock()
+CELL_SIZE = 10
+GRID_WIDTH = WIDTH // CELL_SIZE
+GRID_HEIGHT = HEIGHT // CELL_SIZE
 
 # Colors
-DAY_COLOR = (135, 206, 235)  # Sky Blue
-NIGHT_COLOR = (25, 25, 112)  # Dark Blue
-RAIN_COLOR = (0, 0, 255)  # Blue for raindrops
-CLOUD_COLOR = (200, 200, 200)  # Light Grey for clouds
+LAND_COLOR = (34, 139, 34)
+WATER_COLOR = (70, 130, 180)
+RAIN_COLOR = (0, 0, 255)
+FOG_COLOR = (180, 180, 180, 100)
+DRONE_COLOR = (255, 0, 0)
 
-# Font
-font = pygame.font.Font(None, 36)
+# Initialize screen
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Integrated Simulation")
 
+# Clock
+clock = pygame.time.Clock()
 
-# Helper Function: Draw Text
-def draw_text(surface, text, font, color, x, y):
-    """Draw text on the screen."""
-    rendered_text = font.render(text, True, color)
-    surface.blit(rendered_text, (x, y))
+class Drone:
+    def __init__(self, id, position, battery=100, rotor_speed=1.0):
+        self.id = id
+        self.position = position  # (x, y)
+        self.battery = battery
+        self.rotor_speed = rotor_speed
+        self.weather_affected = False
 
+    def move(self, dx, dy, grid, weather):
+        """Move the drone, taking terrain and weather into account."""
+        if self.battery <= 0:
+            print(f"Drone {self.id}: Battery depleted!")
+            return
 
-class Weather:
-    def __init__(self):
-        self.time_of_day = "day"
-        self.weather_condition = "sunny"
-        self.wind_speed = random.uniform(1, 5)
-        self.wind_direction = random.choice([-1, 1])
-        self.raindrops = []
-        self.clouds = []
-        self.weather_change_interval = 20  # Seconds between weather changes
-        self.last_weather_change = time.time()
-        self.clouds = [pygame.Vector2(random.randint(0, WIDTH), random.randint(50, 150)) for _ in range(10)]
+        new_x = self.position[0] + dx
+        new_y = self.position[1] + dy
 
-    def toggle_time_of_day(self):
-        """Switch between day and night."""
-        self.time_of_day = "night" if self.time_of_day == "day" else "day"
+        # Check terrain
+        if 0 <= new_x < GRID_WIDTH and 0 <= new_y < GRID_HEIGHT:
+            elevation = grid[new_x, new_y]
+            if elevation < weather.water_level:  # Avoid water
+                print(f"Drone {self.id}: Cannot move to water tile.")
+                return
 
-    def maybe_change_weather(self):
-        """Change weather condition at intervals."""
-        current_time = time.time()
-        if current_time - self.last_weather_change >= self.weather_change_interval:
-            self.weather_condition = random.choice(["sunny", "rainy", "cloudy", "foggy", "stormy", "windy", "heatwave"])
-            self.last_weather_change = current_time
-            print(f"Weather changed to: {self.weather_condition}")
+        # Adjust for weather
+        if weather.wind_speed > 3.0:  # Arbitrary threshold
+            self.rotor_speed *= 0.9  # Reduce efficiency
+            self.weather_affected = True
+        else:
+            self.weather_affected = False
 
-            # Adjust raindrops or clouds
-            if self.weather_condition in ["rainy", "stormy"]:
-                self.raindrops = [pygame.Vector2(random.randint(0, WIDTH), random.randint(-50, HEIGHT)) for _ in range(100)]
-            elif self.weather_condition in ["cloudy", "foggy"]:
-                self.clouds = [pygame.Vector2(random.randint(0, WIDTH), random.randint(50, 150)) for _ in range(10)]
-            else:
-                self.raindrops = []
-                self.clouds = []
+        # Move and reduce battery
+        self.position = (new_x, new_y)
+        self.battery -= 1
+        print(f"Drone {self.id} moved to {self.position}. Battery: {self.battery}%.")
 
-    def update_effects(self):
-        """Update weather effects based on conditions."""
-        # Update raindrops
-        for drop in self.raindrops:
-            drop.y += 5  # Fall speed
-            drop.x += self.wind_speed * self.wind_direction
-            if drop.y > HEIGHT or drop.x < 0 or drop.x > WIDTH:
-                drop.y = random.randint(-20, -1)
-                drop.x = random.randint(0, WIDTH)
-
-        # Update clouds
-        for cloud in self.clouds:
-            cloud.x += self.wind_speed * self.wind_direction
-            if cloud.x > WIDTH + 100:
-                cloud.x = -200
-            elif cloud.x < -200:
-                cloud.x = WIDTH + 100
-
-    def draw_effects(self, screen):
-        """Draw weather effects."""
-        for cloud in self.clouds:
-            pygame.draw.ellipse(screen, CLOUD_COLOR, (cloud.x, cloud.y, 120, 60))
-        for drop in self.raindrops:
-            pygame.draw.line(screen, RAIN_COLOR, (drop.x, drop.y), (drop.x, drop.y + 10), 2)
-
-    def get_stats(self):
-        """Return current weather stats."""
-        wind_dir = "Right" if self.wind_direction > 0 else "Left"
+    def report_status(self):
+        """Report current drone status."""
         return {
-            "Time of Day": self.time_of_day.capitalize(),
-            "Weather": self.weather_condition.capitalize(),
-            "Wind Speed": f"{self.wind_speed:.1f} m/s",
-            "Wind Direction": wind_dir,
+            "ID": self.id,
+            "Position": self.position,
+            "Battery": self.battery,
+            "Rotor Speed": self.rotor_speed,
+            "Weather Affected": self.weather_affected,
         }
 
+class WeatherSystem:
+    def __init__(self, season="rainy"):
+        self.season = season
+        self.weather_condition = "sunny"
+        self.wind_speed = random.uniform(1, 5)
+        self.water_level = 0.3  # Flood level
 
-# Initialize Weather
-weather = Weather()
+    def update_weather(self):
+        """Randomly update weather conditions."""
+        probabilities = {"sunny": 0.5, "rainy": 0.3, "foggy": 0.2}
+        self.weather_condition = random.choices(list(probabilities.keys()), weights=probabilities.values())[0]
 
-# Main Game Loop
+        # Adjust wind and water levels
+        if self.weather_condition == "rainy":
+            self.wind_speed = random.uniform(3, 7)
+            self.water_level += 0.05  # Simulate flooding
+        elif self.weather_condition == "foggy":
+            self.wind_speed = random.uniform(1, 3)
+        else:
+            self.wind_speed = random.uniform(0, 2)
+            self.water_level = max(0.3, self.water_level - 0.02)  # Dry up slowly
+
+    def draw_weather(self, screen):
+        """Visualize weather effects."""
+        if self.weather_condition == "foggy":
+            fog_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            fog_surface.fill(FOG_COLOR)
+            screen.blit(fog_surface, (0, 0))
+        elif self.weather_condition == "rainy":
+            for _ in range(100):
+                x = random.randint(0, WIDTH)
+                y = random.randint(0, HEIGHT)
+                pygame.draw.line(screen, RAIN_COLOR, (x, y), (x, y + 5), 1)
+
+class GridSimulation:
+    def __init__(self, width, height):
+        self.grid = np.zeros((width, height))
+        self.generate_terrain()
+
+    def generate_terrain(self):
+        """Generate random terrain for the grid."""
+        for x in range(GRID_WIDTH):
+            for y in range(GRID_HEIGHT):
+                self.grid[x, y] = random.uniform(0, 1)  # Elevation (0 = water, 1 = land)
+
+    def draw_grid(self, screen, weather):
+        """Visualize the terrain."""
+        for x in range(GRID_WIDTH):
+            for y in range(GRID_HEIGHT):
+                rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                elevation = self.grid[x, y]
+                if elevation < weather.water_level:
+                    pygame.draw.rect(screen, WATER_COLOR, rect)
+                else:
+                    pygame.draw.rect(screen, LAND_COLOR, rect)
+
+# Initialize systems
+grid_sim = GridSimulation(GRID_WIDTH, GRID_HEIGHT)
+weather = WeatherSystem(season="rainy")
+drones = [Drone(id=i, position=(random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1))) for i in range(3)]
+
+# Main loop
 running = True
-last_update_time = time.time()
-
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    # Update time
-    current_time = time.time()
-    dt = current_time - last_update_time
-    last_update_time = current_time
+    # Update systems
+    weather.update_weather()
+    for drone in drones:
+        dx, dy = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
+        drone.move(dx, dy, grid_sim.grid, weather)
 
-    # Update weather
-    weather.maybe_change_weather()
-    weather.update_effects()
+    # Draw everything
+    screen.fill((0, 0, 0))
+    grid_sim.draw_grid(screen, weather)
+    weather.draw_weather(screen)
+    for drone in drones:
+        pygame.draw.circle(screen, DRONE_COLOR, (drone.position[0] * CELL_SIZE + CELL_SIZE // 2, drone.position[1] * CELL_SIZE + CELL_SIZE // 2), 5)
 
-    # Draw the environment in the main window
-    screen.fill(DAY_COLOR if weather.time_of_day == "day" else NIGHT_COLOR)
-    weather.draw_effects(screen)
-
-    # Draw stats in the stats window
-    stats_screen.fill((50, 50, 50))  # Dark background for stats window
-    stats = weather.get_stats()
-    y_offset = 10
-    for key, value in stats.items():
-        draw_text(stats_screen, f"{key}: {value}", font, (255, 255, 255), 10, y_offset)
-        y_offset += 30
-
-    # Update both windows
-    pygame.display.update()
-    clock.tick(60)
+    pygame.display.flip()
+    clock.tick(30)
 
 pygame.quit()

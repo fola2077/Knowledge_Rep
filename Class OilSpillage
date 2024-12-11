@@ -1,3 +1,6 @@
+import pygame
+import numpy
+
 class DroneEnvironment:
     def __init__(self, num_drones=3, num_spillages=5):
         """
@@ -83,47 +86,3 @@ class DroneEnvironment:
         pygame.quit()
 
 
-
-######################################
-
-from test_qlearn import DroneAgent
-
-# Initialize environment and agent
-env = DroneEnvironment(num_drones=3, num_spillages=5)
-agent = DroneAgent(state_dim=2, action_dim=5)  # State dim = 2 (x, y), 5 actions
-
-num_episodes = 10  # Keep fewer episodes for Pygame visualization
-try:
-    for episode in range(num_episodes):
-        env.reset()
-        done = False
-        total_reward = 0
-        step = 0
-
-        while not done:
-            # Handle Pygame events to allow window closing
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    done = True
-                    env.done = True
-
-            state = env.get_state()
-            actions = [agent.select_action(s) for s in state]  # Actions for each drone
-            next_state, rewards, done, _ = env.step(actions)
-
-            # Update agent
-            for i, reward in enumerate(rewards):
-                agent.store_transition(state[i], actions[i], reward, next_state[i], done)
-            agent.train_step()
-
-            total_reward += sum(rewards)
-            step += 1
-
-            # Render environment
-            env.render()
-
-        print(f"Episode {episode + 1}, Total Reward: {total_reward}")
-
-finally:
-    # Ensure resources are released
-    env.close()
