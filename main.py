@@ -21,6 +21,28 @@ CLOUD_COLOR = (200, 200, 200)
 RAIN_COLOR = (0, 0, 255)
 FOG_COLOR = (180, 180, 180, 100)
 HAZE_COLOR = (210, 180, 140, 70)
+FPS = 60 #frames per second
+
+class TimeManager:
+    """Manages the simulation's time system."""
+    def __init__(self):
+        self.hour = 6
+        self.minute = 0
+        self.day_duration = 24  # Hours in a day
+
+    def update(self, dt):
+        """Update the time of day."""
+        self.minute += dt * 10  # Accelerated time progression
+        if self.minute >= 60:
+            self.minute = 0
+            self.hour += 1
+        if self.hour >= self.day_duration:
+            self.hour = 0
+
+    def is_daytime(self):
+        """Determine if it is daytime."""
+        return 6 <= self.hour < 18
+
 
 # Helper Function: Draw Text
 def draw_text(surface, text, font, color, x, y):
@@ -178,14 +200,28 @@ class WeatherSystem:
             if cloud["position"].x > WIDTH:
                 cloud["position"].x = -cloud["size"]
 
-        # Raindrops
-        if self.weather_condition in ["rainy", "heavystorms"]:
-            for drop in self.raindrops:
-                pygame.draw.line(screen, RAIN_COLOR, (drop.x, drop.y), (drop.x, drop.y + 10), 2)
+        # # Raindrops
+        # if self.weather_condition in ["rainy", "heavystorms"]:
+        #     for drop in self.raindrops:
+        #         pygame.draw.line(screen, RAIN_COLOR, (drop.x, drop.y), (drop.x, drop.y + 10), 2)
+
+    def draw_rain(self, screen):
+        """Render rain effects."""
+        for _ in range(50):
+            x = random.randint(0, WIDTH)
+            y = random.randint(0, HEIGHT)
+            pygame.draw.line(screen, RAIN_COLOR, (x, y), (x, y + 10), 2)
+
+    def draw_fog(self, screen):
+        """Render fog overlay."""
+        fog_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        fog_surface.fill((180, 180, 180, 80))
+        screen.blit(fog_surface, (0, 0))
 
     def get_stats(self):
         """Return current weather stats."""
         return {
+            "Time": f"{time_manager.hour:02}:{time_manager.minute:02}",
             "Time of Day": self.time_of_day.capitalize(),
             "Weather": self.weather_condition.capitalize(),
             "Dynamic Condition": self.dynamic_condition or "None",
@@ -198,7 +234,11 @@ class WeatherSystem:
 
 # Initialize the weather system
 weather = WeatherSystem(season="rainy")
-font = pygame.font.Font(None, 36)
+font = pygame.font.Font(None, 24)
+
+ # Initialize components
+time_manager = TimeManager()
+weather = WeatherSystem(season="rainy")
 
 # Main Loop
 running = True
