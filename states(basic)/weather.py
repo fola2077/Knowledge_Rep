@@ -188,20 +188,81 @@ class WeatherSystem:
             self.temperature -= random.uniform(0.5, 1.5)
             self.humidity = random.randint(90, 100)
 
+    def update_clouds(self):
+        """
+        Update cloud positions based on wind speed and direction.
+        """
+        for cloud in self.clouds:
+            # Calculate directional movement using wind direction
+            wind_vector = pygame.Vector2(
+                math.cos(math.radians(self.wind_direction_angle)),
+                math.sin(math.radians(self.wind_direction_angle))
+            )
+            cloud["position"] += wind_vector * self.wind_speed
+
+            # Wrap clouds around the screen
+            if cloud["position"].x > WIDTH:
+                cloud["position"].x = -cloud["size"]
+            elif cloud["position"].x < -cloud["size"]:
+                cloud["position"].x = WIDTH
+            if cloud["position"].y > HEIGHT:
+                cloud["position"].y = random.randint(50, 150)
+            elif cloud["position"].y < 0:
+                cloud["position"].y = HEIGHT
+
+    def update_raindrops(self):
+        """
+        Update raindrop positions based on wind speed and direction.
+        """
+        wind_vector = pygame.Vector2(
+            math.cos(math.radians(self.wind_direction_angle)) * self.wind_speed,
+            1.0  # Raindrops mostly move downward
+        )
+        for drop in self.raindrops:
+            drop["start"] += wind_vector * random.uniform(1.0, 1.5)
+            drop["end"] += wind_vector * random.uniform(1.0, 1.5)
+
+            # Reset raindrops that move off-screen
+            if drop["start"].y > HEIGHT:
+                drop["start"].y = random.randint(-10, 0)
+                drop["end"].y = drop["start"].y + 10
+                drop["start"].x = random.randint(0, WIDTH)
+                drop["end"].x = drop["start"].x
+
+
+
     def draw_weather(self, screen):
-        """Visualize weather effects."""
-        # Background
+        """
+        Visualize the weather conditions on the screen.
+        """
+        # Background color based on time of day
         bg_color = DAY_COLOR if self.time_of_day == "day" else NIGHT_COLOR
         screen.fill(bg_color)
 
-        # Clouds
-        for cloud in self.clouds:
-            pygame.draw.ellipse(
-                screen, CLOUD_COLOR, (cloud["position"].x, cloud["position"].y, cloud["size"], cloud["size"] // 2)
-            )
-            cloud["position"].x += cloud["speed"]
-            if cloud["position"].x > WIDTH:
-                cloud["position"].x = -cloud["size"]
+        # Draw clouds
+        if self.weather_condition == "stormy":
+            self.draw_darker_clouds(screen)
+        else:
+            for cloud in self.clouds:
+                pygame.draw.ellipse(
+                    screen, CLOUD_COLOR,
+                    (cloud["position"].x, cloud["position"].y, cloud["size"], cloud["size"] // 2)
+                )
+                cloud["position"].x += cloud["speed"]
+                if cloud["position"].x > WIDTH:
+                    cloud["position"].x = -cloud["size"]
+
+        # Draw specific weather effects
+        if self.weather_condition in ["rainy", "heavystorms"]:
+            self.update_raindrops()
+            self.draw_rain(screen)
+
+        if self.dynamic_condition == "harmattan":
+            self.draw_harmattan(screen)
+
+        if self.weather_condition == "heavystorms":
+            self.draw_lightning(screen)
+
 
 
     def draw_rain(self, screen):
@@ -219,6 +280,37 @@ class WeatherSystem:
         fog_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         fog_surface.fill((180, 180, 180, 80))
         screen.blit(fog_surface, (0, 0))
+    
+    def draw_harmattan(self, screen):
+        """
+        Render a dusty overlay for the Harmattan condition.
+        """
+        harmattan_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        harmattan_surface.fill((210, 180, 140, 70))  # Semi-transparent sandy color
+        screen.blit(harmattan_surface, (0, 0))
+
+    def draw_lightning(self, screen):
+        """
+        Render a lightning effect on the screen during storms.
+        """
+        if random.random() < 0.02:  # Lightning probability
+            lightning_rect = pygame.Rect(0, random.randint(0, HEIGHT // 2), WIDTH, random.randint(50, 150))
+            pygame.draw.rect(screen, (255, 255, 255), lightning_rect)
+
+    def draw_darker_clouds(self, screen):
+        """
+        Render darker clouds for stormy conditions.
+        """
+        for cloud in self.clouds:
+            pygame.draw.ellipse(
+                screen, (50, 50, 50),  # Darker gray color
+                (cloud["position"].x, cloud["position"].y, cloud["size"], cloud["size"] // 2)
+            )
+            cloud["position"].x += cloud["speed"]
+            if cloud["position"].x > WIDTH:
+                cloud["position"].x = -cloud["size"]
+
+
 
     def get_stats(self):
         """Return current weather stats."""

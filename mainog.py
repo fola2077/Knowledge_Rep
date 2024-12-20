@@ -1,11 +1,4 @@
-# ! This is an important comment (red)
-# ? Why is this function here? (blue)
-# TODO: Add a parameter for user input (orange)
-# * Remember to test the API response (green)
-# This is a regular comment (grey)
-def example_function():
-    pass
-
+#IMPORTING LIBRARIES
 
 import pygame
 import random
@@ -13,6 +6,8 @@ import math
 import time
 import numpy as np
 from scipy.ndimage import gaussian_filter
+
+# STATE VARIABLES
 
 class Drone:
     def __init__(self, id, position, battery=100, rotor_speed=1.0):
@@ -242,4 +237,4 @@ if __name__ == "__main__":
     simulation = GridSimulation()
     
     # Change use_random to False to load the saved environment
-    simulation.run(use_random=True)  # Set to False to use fixed environment
+    simulation.run(use_random = True)  # Set to False to use fixed environment
