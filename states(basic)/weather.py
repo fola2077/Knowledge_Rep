@@ -54,12 +54,14 @@ def draw_text(surface, text, font, color, x, y):
 class WeatherSystem:
     def __init__(self, season="rainy"):
         # Time and Season
+        self.time_manager = TimeManager() # Unified time management
         self.season = season
         self.hour = 6  # 6 AM start
         self.minute = 0
         self.time_of_day = "day"  # 'day', 'night'
         self.cycle_duration = 24  # 24-hour simulation
         self.last_update_time = time.time()
+
 
         # Weather Attributes
         self.weather_condition = "sunny"
@@ -80,7 +82,9 @@ class WeatherSystem:
         self.raindrops = []
 
     def create_cloud(self):
-        """Create a cloud with random properties."""
+        """
+        Create a cloud with random properties.
+        """
         return {
             "position": pygame.Vector2(random.randint(0, WIDTH), random.randint(50, 150)),
             "size": random.uniform(80, 150),
@@ -88,19 +92,18 @@ class WeatherSystem:
         }
 
     def update_time(self, dt):
-        """Simulate the progression of time."""
-        self.minute += dt * 10  # Accelerate time for simulation purposes
-        if self.minute >= 60:
-            self.minute = 0
-            self.hour += 1
-        if self.hour >= 24:
-            self.hour = 0
-            self.change_season()
+        """
+        Update time using TimeManager.
+        """
+        self.time_manager.update(dt)
+        self.update_time_of_day()
 
-        # Update time of day
-        self.time_of_day = "day" if 6 <= self.hour < 18 else "night"
-
-
+    def update_time_of_day(self):
+        """
+        Update the time of day based on TimeManager's hour.
+        """
+        self.time_of_day = "day" if self.time_manager.is_daytime() else "night"
+        
     def change_season(self):
         """Change the season based on time or a defined rule."""
         if self.season == "rainy":
@@ -200,17 +203,16 @@ class WeatherSystem:
             if cloud["position"].x > WIDTH:
                 cloud["position"].x = -cloud["size"]
 
-        # # Raindrops
-        # if self.weather_condition in ["rainy", "heavystorms"]:
-        #     for drop in self.raindrops:
-        #         pygame.draw.line(screen, RAIN_COLOR, (drop.x, drop.y), (drop.x, drop.y + 10), 2)
 
     def draw_rain(self, screen):
-        """Render rain effects."""
-        for _ in range(50):
-            x = random.randint(0, WIDTH)
-            y = random.randint(0, HEIGHT)
-            pygame.draw.line(screen, RAIN_COLOR, (x, y), (x, y + 10), 2)
+        for drop in self.raindrops:
+            pygame.draw.line(screen, RAIN_COLOR, drop["start"], drop["end"], 2)
+            drop["start"].y += drop["speed"]
+            drop["end"].y += drop["speed"]
+            if drop["start"].y > HEIGHT:
+                drop["start"].y = random.randint(-10, 0)
+                drop["end"].y = drop["start"].y + 10
+
 
     def draw_fog(self, screen):
         """Render fog overlay."""

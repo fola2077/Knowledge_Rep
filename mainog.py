@@ -1,3 +1,12 @@
+# ! This is an important comment (red)
+# ? Why is this function here? (blue)
+# TODO: Add a parameter for user input (orange)
+# * Remember to test the API response (green)
+# This is a regular comment (grey)
+def example_function():
+    pass
+
+
 import pygame
 import random
 import math
@@ -226,9 +235,11 @@ class GridSimulation:
 
         pygame.quit()
 
+
+
+
 if __name__ == "__main__":
     simulation = GridSimulation()
     
     # Change use_random to False to load the saved environment
     simulation.run(use_random=True)  # Set to False to use fixed environment
-
