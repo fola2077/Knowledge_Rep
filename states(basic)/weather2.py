@@ -4,6 +4,7 @@ import math
 import time
 import csv
 from pygame.locals import *
+import json
 
 # Initialize Pygame
 pygame.init()
@@ -11,7 +12,7 @@ pygame.init()
 # Screen Dimensions
 WIDTH, HEIGHT = 1200, 800
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Enhanced Weather System Simulation")
+pygame.display.set_caption("Niger Delta Weather Simulation for Drone Oil Spill Detection")
 
 # Clock for controlling the frame rate
 clock = pygame.time.Clock()
@@ -23,18 +24,17 @@ CLOUD_COLOR = (220, 220, 220)
 RAIN_COLOR = (0, 0, 255)
 SNOW_COLOR = (255, 250, 250)
 FOG_COLOR = (180, 180, 180, 80)
-HAZE_COLOR = (210, 180, 140, 70)
 STORM_COLOR = (50, 50, 50)
 LIGHTNING_COLOR = (255, 255, 255)
 HARMATTAN_COLOR = (210, 180, 140, 100)
 
+# Sky Colors for Day-Night Cycle
 SKY_COLORS = {
     "sunrise": (255, 223, 186),
     "day": DAY_COLOR,
     "sunset": (255, 140, 0),
     "night": NIGHT_COLOR
 }
-
 
 # Fonts
 FONT = pygame.font.Font(None, 24)
@@ -69,16 +69,6 @@ class TimeManager:
             self.day_count += 1
             self.check_season_change()
 
-    def update(self, wind_speed, wind_direction):
-        angle_rad = math.radians(wind_direction)
-        wind_dx = math.cos(angle_rad) * wind_speed
-        wind_dy = math.sin(angle_rad) * wind_speed
-        self.x += wind_dx * 0.1
-        self.y += (self.speed + wind_dy) * 0.1
-        if self.y > HEIGHT:
-            self.reset()
-
-
     def is_daytime(self):
         """Determine if it is daytime."""
         return 6 <= self.hour < 18
@@ -103,24 +93,159 @@ class TimeManager:
 class WeatherState:
     """Represents a weather state with associated attributes."""
     def __init__(self, name, temperature_range, humidity_range, wind_speed_range,
-                 precipitation_type, visibility, cloud_density):
+                 precipitation_type, visibility_range, cloud_density, air_pressure_range=(980, 1050)):
         self.name = name
         self.temperature = random.uniform(*temperature_range)
         self.humidity = random.uniform(*humidity_range)
         self.wind_speed = random.uniform(*wind_speed_range)
-        self.wind_direction = random.uniform(*wind_direction_range)  # Degrees
-        self.precipitation_type = precipitation_type  # e.g., 'None', 'Rain'
-        self.visibility = visibility  # Affects sensor accuracy
+        self.wind_direction = random.uniform(0, 360)  # Degrees
+        self.precipitation_type = precipitation_type  # e.g., 'None', 'Rain', 'Thunderstorm'
+        self.visibility_range = visibility_range  # (max visibility, min visibility)
         self.cloud_density = cloud_density  # Affects visibility
+        self.air_pressure = random.uniform(*air_pressure_range)  # hPa
         self.intensity = 0.5  # Initial intensity (0 to 1)
+        self.visibility = self.calculate_visibility()
+
+    def calculate_visibility(self):
+        """Calculate visibility based on intensity and visibility range."""
+        max_vis, min_vis = self.visibility_range
+        # Base visibility reduction based on intensity
+        visibility = max_vis - self.intensity * (max_vis - min_vis)
+
+        # Additional reduction based on cloud density
+        visibility -= self.cloud_density * 0.1  # Adjustable scaling factor
+
+        # Additional reduction based on humidity (for Foggy weather)
+        if self.name == "Foggy":
+            visibility -= (self.humidity / 100) * 0.1  # Adjust scaling as needed
+
+        # Seasonal adjustment for Harmattan
+        if self.name == "Harmattan":
+            visibility -= 0.2  # Reduction due to dust
+
+        # Ensure visibility is within the defined range
+        visibility = max(min_vis, visibility)
+
+        # Debugging Statement
+        # print(f"[DEBUG] {self.name} Weather: Intensity={self.intensity:.2f}, Visibility={visibility:.2f}")
+
+        return visibility
+
+    def update_visibility(self):
+        """Update visibility based on intensity changes."""
+        self.visibility = self.calculate_visibility()
 
     def increase_intensity(self, amount=0.01):
         """Gradually increase the intensity of the weather state."""
         self.intensity = min(1.0, self.intensity + amount)
+        self.update_visibility()  # Ensure visibility is updated
+        # print(f"[DEBUG] {self.name} Weather: Intensity increased to {self.intensity:.2f}")
 
     def decrease_intensity(self, amount=0.01):
         """Gradually decrease the intensity of the weather state."""
         self.intensity = max(0.0, self.intensity - amount)
+        self.update_visibility()  # Ensure visibility is updated
+        # print(f"[DEBUG] {self.name} Weather: Intensity decreased to {self.intensity:.2f}")
+
+# Cloud Class for Visual Representation
+class Cloud:
+    """Represents a single cloud in the simulation."""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        """Initialize or reset the cloud's position and properties."""
+        self.x = random.randint(-WIDTH, WIDTH)
+        self.y = random.randint(50, HEIGHT // 2)
+        self.speed = random.uniform(0.2, 0.5)  # Slower movement
+        self.size = random.randint(100, 200)  # Width of the cloud
+
+    def update(self):
+        """Update the cloud's position."""
+        self.x += self.speed
+        if self.x - self.size > WIDTH:
+            self.reset()
+
+    def draw(self, surface):
+        """Draw the cloud on the given surface."""
+        # Draw multiple overlapping ellipses to form a fluffy cloud
+        ellipse_width = self.size
+        ellipse_height = self.size // 2
+        offsets = [(-ellipse_width * 0.3, 0), (0, -ellipse_height * 0.5), (ellipse_width * 0.3, 0)]
+        for dx, dy in offsets:
+            pygame.draw.ellipse(surface, CLOUD_COLOR, (self.x + dx, self.y + dy, ellipse_width, ellipse_height))
+
+# Lightning Strike Class
+class LightningStrike:
+    """Handles lightning strikes in stormy weather."""
+    def __init__(self):
+        self.active = False
+        self.duration = 0
+        self.start_time = 0
+        self.start_x = 0
+        self.start_y = 0
+        self.end_x = 0
+        self.end_y = 0
+
+    def trigger(self):
+        """Initiate a lightning strike."""
+        if not self.active:
+            self.active = True
+            self.duration = random.uniform(0.1, 0.3)
+            self.start_time = time.time()
+            self.start_x = random.randint(0, WIDTH)
+            self.start_y = random.randint(0, HEIGHT // 2)
+            self.end_x = self.start_x + random.randint(-20, 20)
+            self.end_y = self.start_y + random.randint(50, 150)
+            print(f"[DEBUG] Lightning Strike initiated at ({self.start_x}, {self.start_y}) to ({self.end_x}, {self.end_y})")
+
+    def update(self):
+        """Update the lightning strike status."""
+        if self.active and (time.time() - self.start_time) > self.duration:
+            self.active = False
+            print(f"[DEBUG] Lightning Strike ended.")
+
+    def draw(self, surface):
+        """Draw the lightning strike."""
+        if self.active:
+            pygame.draw.line(surface, LIGHTNING_COLOR, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
+
+# Raindrop Class for Visual Representation
+class Raindrop:
+    """Represents a single raindrop in the simulation."""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        """Initialize or reset the raindrop's position and properties."""
+        self.x = random.randint(0, WIDTH)
+        self.y = random.randint(-HEIGHT, 0)
+        self.length = random.randint(10, 20)
+        self.speed = random.uniform(4, 7)
+        self.vx = 0
+        self.vy = self.speed
+
+    def update(self, wind_speed, wind_direction):
+        """Update the raindrop's position based on wind."""
+        angle_rad = math.radians(wind_direction)
+        wind_dx = math.cos(angle_rad) * wind_speed
+        wind_dy = math.sin(angle_rad) * wind_speed
+
+        # Apply wind to raindrop velocity
+        self.vx += wind_dx * 0.1
+        self.vy += wind_dy * 0.1
+
+        # Update position
+        self.x += self.vx * 0.1
+        self.y += self.vy * 0.1
+
+        # Reset if out of bounds
+        if self.y > HEIGHT:
+            self.reset()
+
+    def draw(self, surface):
+        """Draw the raindrop on the given surface."""
+        pygame.draw.line(surface, RAIN_COLOR, (self.x, self.y), (self.x, self.y + self.length), 1)
 
 # Weather System with Gradual Transitions and Intensity-Dependent Probabilities
 class WeatherSystem:
@@ -135,7 +260,7 @@ class WeatherSystem:
                 humidity_range=(30, 50),
                 wind_speed_range=(5, 15),
                 precipitation_type="None",
-                visibility=1.0,
+                visibility_range=(1.0, 0.8), # minimal impact on visibility
                 cloud_density=0.2
             ),
             "Rainy": WeatherState(
@@ -144,7 +269,7 @@ class WeatherSystem:
                 humidity_range=(70, 100),
                 wind_speed_range=(10, 25),
                 precipitation_type="Rain",
-                visibility=0.6,
+                visibility_range=(0.6, 0.3), # reduced visibility with higher intensity
                 cloud_density=0.7
             ),
             "Foggy": WeatherState(
@@ -153,7 +278,7 @@ class WeatherSystem:
                 humidity_range=(80, 100),
                 wind_speed_range=(0, 5),
                 precipitation_type="None",
-                visibility=0.3,
+                visibility_range = (0.4, 0.1), # very low visibility
                 cloud_density=0.5
             ),
             "Stormy": WeatherState(
@@ -162,7 +287,7 @@ class WeatherSystem:
                 humidity_range=(75, 100),
                 wind_speed_range=(20, 40),
                 precipitation_type="Rain",
-                visibility=0.5,
+                visibility_range=(0.5, 0.2), # reduced visibility with higher intensity
                 cloud_density=0.8
             ),
             "Harmattan": WeatherState(
@@ -171,7 +296,7 @@ class WeatherSystem:
                 humidity_range=(20, 40),
                 wind_speed_range=(10, 20),
                 precipitation_type="None",
-                visibility=0.4,
+                visibility_range=(0.7, 0.3), # reduced visibility due to dust
                 cloud_density=0.3
             )
         }
@@ -214,14 +339,26 @@ class WeatherSystem:
         self.transition_timer = 0
         self.transition_interval = 60  # Seconds between potential transitions
 
+        # Initialize weather effects
+        self.raindrops = [Raindrop() for _ in range(200)]
+        self.lightning = LightningStrike()
+
+        # Initialize clouds
+        self.clouds = [Cloud() for _ in range(10)]  # Adjust number as needed
+
         # CSV Logging setup
-        self.csv_file = open('weather_stats.csv', mode='w', newline='')
-        self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow([
-            'Day', 'Hour', 'Season', 'Weather',
-            'Intensity', 'Temperature (°C)', 'Humidity (%)',
-            'Wind Speed (m/s)', 'Precipitation', 'Visibility', 'Cloud Density'
-        ])
+        try:
+            self.csv_file = open('weather_stats.csv', mode='w', newline='')
+            self.csv_writer = csv.writer(self.csv_file)
+            self.csv_writer.writerow([
+                'Day', 'Hour', 'Season', 'Weather',
+                'Intensity', 'Temperature (°C)', 'Humidity (%)',
+                'Wind Speed (m/s)', 'Wind Direction (°)', 'Precipitation',
+                'Visibility', 'Cloud Density', 'Air Pressure (hPa)'
+            ])
+        except IOError as e:
+            print(f"Failed to open CSV file: {e}")
+            self.csv_writer = None
 
     def initialize_state(self):
         """Initialize the weather state based on the current season."""
@@ -237,17 +374,19 @@ class WeatherSystem:
         # Gradual intensity changes
         self.handle_intensity_changes()
 
+        # Update wind direction gradually
         self.update_wind_direction()
 
         # Attempt weather transition at defined intervals
         if self.transition_timer >= self.transition_interval:
             self.transition_timer = 0
             self.attempt_transition()
+
+        # Update weather effects
         self.update_weather_effects(dt)
 
     def handle_intensity_changes(self):
         """Gradually increase or decrease the intensity of the current weather state."""
-        # Example logic: If intensity is high, start decreasing; if low, start increasing
         if self.current_state.intensity >= 0.8:
             self.current_state.decrease_intensity(amount=0.005)
         elif self.current_state.intensity <= 0.3:
@@ -258,12 +397,11 @@ class WeatherSystem:
                 self.current_state.increase_intensity(amount=0.002)
             else:
                 self.current_state.decrease_intensity(amount=0.002)
-    
+
     def update_wind_direction(self):
         """Gradually change the wind direction."""
         change = random.uniform(-1, 1)  # Degrees per update
         self.current_state.wind_direction = (self.current_state.wind_direction + change) % 360
-
 
     def get_sky_color(self):
         """Calculate the current sky color based on the time of day."""
@@ -288,8 +426,6 @@ class WeatherSystem:
             int(color_start[i] + (color_end[i] - color_start[i]) * factor)
             for i in range(3)
         ])
-
-
 
     def attempt_transition(self):
         """Attempt to transition to a new weather state based on probabilities and intensity."""
@@ -338,71 +474,111 @@ class WeatherSystem:
 
     def log_weather_stats(self):
         """Log the current weather statistics to the CSV file."""
-        self.csv_writer.writerow([
-            self.time_manager.day_count + 1,
-            self.time_manager.hour,
-            self.time_manager.season,
-            self.current_state.name,
-            f"{self.current_state.intensity:.2f}",
-            f"{self.current_state.temperature:.1f}",
-            f"{self.current_state.humidity:.1f}",
-            f"{self.current_state.wind_speed:.1f}",
-            self.current_state.precipitation_type,
-            f"{self.current_state.visibility:.2f}",
-            f"{self.current_state.cloud_density:.2f}"
-        ])
+        if self.csv_writer:
+            try:
+                self.csv_writer.writerow([
+                    self.time_manager.day_count + 1,
+                    self.time_manager.hour,
+                    self.time_manager.season,
+                    self.current_state.name,
+                    f"{self.current_state.intensity:.2f}",
+                    f"{self.current_state.temperature:.1f}",
+                    f"{self.current_state.humidity:.1f}",
+                    f"{self.current_state.wind_speed:.1f}",
+                    f"{self.current_state.wind_direction:.1f}",
+                    self.current_state.precipitation_type,
+                    f"{self.current_state.visibility:.2f}",
+                    f"{self.current_state.cloud_density:.2f}",
+                    f"{self.current_state.air_pressure:.1f}"
+                ])
+            except IOError as e:
+                print(f"Failed to write to CSV file: {e}")
 
     def close_csv(self):
         """Close the CSV file."""
-        self.csv_file.close()
+        if self.csv_file:
+            try:
+                self.csv_file.close()
+            except IOError as e:
+                print(f"Failed to close CSV file: {e}")
+
+    def update_weather_effects(self, dt):
+        """Update dynamic weather effects like rain and lightning."""
+        weather = self.current_state
+
+        # Update raindrops based on wind speed and direction
+        if weather.precipitation_type == "Rain":
+            for drop in self.raindrops:
+                drop.update(wind_speed=weather.wind_speed, wind_direction=weather.wind_direction)
+        else:
+            # Reset raindrops if not raining
+            for drop in self.raindrops:
+                drop.reset()
+
+        # Handle lightning in Stormy weather
+        if weather.name == "Stormy" and weather.intensity > 0.5:
+            if random.random() < 0.02 * weather.intensity:
+                self.lightning.trigger()
+        else:
+            self.lightning.active = False
+
+        self.lightning.update()
+
+        # Update clouds
+        for cloud in self.clouds:
+            cloud.update()
 
     def render_weather_effects(self, surface):
         """Draw visual representations of current weather."""
         weather = self.current_state
 
-        # Adjust background color based on time of day
+        # Get dynamic sky color
         bg_color = self.get_sky_color()
         surface.fill(bg_color)
 
         # Overlay based on weather type and intensity
         if weather.name == "Sunny":
-            # Increase brightness based on intensity
-            brightness = min(255, int(135 + (weather.intensity * 120)))  # From 135 to 255
-            surface.fill((brightness, 206, 235), special_flags=pygame.BLEND_ADD)
+            # Calculate brightness factor based on intensity
+            brightness_alpha = int(weather.intensity * 100)  # Alpha ranges from 0 (transparent) to 100 (semi-transparent)
+            brightness_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            brightness_surface.fill((255, 255, 200, brightness_alpha))  # Slightly yellowish white with variable alpha
+            surface.blit(brightness_surface, (0, 0))
+
         elif weather.name == "Rainy":
-            # Draw rain intensity
-            for _ in range(int(100 * weather.intensity)):
-                x = random.randint(0, WIDTH)
-                y = random.randint(0, HEIGHT)
-                length = random.randint(5, 15)
-                pygame.draw.line(surface, RAIN_COLOR, (x, y), (x, y + length), 1)
+            # Draw raindrops
+            for drop in self.raindrops:
+                drop.draw(surface)
         elif weather.name == "Foggy":
             # Draw fog overlay
             fog_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            fog_alpha = int(80 * weather.intensity)
+            fog_alpha = int(80 * weather.intensity)  # Adjust scaling as needed
             fog_surface.fill((180, 180, 180, fog_alpha))
             surface.blit(fog_surface, (0, 0))
         elif weather.name == "Stormy":
-            # Draw storm clouds and lightning
-            for _ in range(int(50 * weather.intensity)):
-                cloud_x = random.randint(0, WIDTH)
-                cloud_y = random.randint(0, HEIGHT // 2)
-                cloud_width = random.randint(50, 150)
-                cloud_height = cloud_width // 2
-                pygame.draw.ellipse(surface, STORM_COLOR, (cloud_x, cloud_y, cloud_width, cloud_height))
-            # Occasionally draw lightning
-            if random.random() < 0.05 * weather.intensity:
-                start_x = random.randint(0, WIDTH)
-                start_y = random.randint(0, HEIGHT // 2)
-                end_x = start_x + random.randint(-20, 20)
-                end_y = start_y + random.randint(50, 150)
-                pygame.draw.line(surface, LIGHTNING_COLOR, (start_x, start_y), (end_x, end_y), 2)
+            # Draw storm clouds
+            for cloud in self.clouds:
+                cloud.draw(surface)
+            # Draw lightning
+            self.lightning.draw(surface)
         elif weather.name == "Harmattan":
             # Draw hazy overlay
             haze_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             haze_alpha = int(70 * weather.intensity)
             haze_surface.fill((210, 180, 140, haze_alpha))
             surface.blit(haze_surface, (0, 0))
+
+        # Optionally, add an overlay based on visibility to simulate reduced visibility
+        if weather.visibility < 1.0:
+            visibility_factor = 1.0 - weather.visibility  # Higher factor means lower visibility
+            visibility_alpha = int(visibility_factor * 150)  # Adjust scaling as needed
+            visibility_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            visibility_overlay.fill((0, 0, 0, visibility_alpha))  # Dark overlay
+            surface.blit(visibility_overlay, (0, 0))
+
+        # Draw clouds moving across the screen
+        if weather.name in ["Sunny", "Rainy", "Foggy", "Stormy", "Harmattan"]:
+            for cloud in self.clouds:
+                cloud.draw(surface)
 
 # Simulation Orchestration
 class Simulation:
@@ -412,13 +588,11 @@ class Simulation:
         self.running = True
 
     def run(self):
-        last_update_time = time.time()
         while self.running:
             dt = clock.tick(FPS) / 1000  # Delta time in seconds
 
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    self.running = False
+            # Handle events
+            self.handle_events()
 
             # Update simulation components
             self.time_manager.update(dt)
@@ -434,6 +608,15 @@ class Simulation:
         # After loop ends, close the CSV file
         self.weather_system.close_csv()
         pygame.quit()
+
+    def handle_events(self):
+        """Handle user inputs and events."""
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                self.running = False
+            elif event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    self.running = False
 
     def render(self):
         """Render all simulation components."""
@@ -461,7 +644,8 @@ class Simulation:
             f"Wind Direction: {weather.wind_direction:.1f}°",
             f"Precipitation: {weather.precipitation_type}",
             f"Visibility: {weather.visibility:.2f}",
-            f"Cloud Density: {weather.cloud_density:.2f}"
+            f"Cloud Density: {weather.cloud_density:.2f}",
+            f"Air Pressure: {weather.air_pressure:.1f} hPa"
         ]
 
         for stat in stats:
