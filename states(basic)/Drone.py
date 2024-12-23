@@ -1,34 +1,30 @@
+# drone.py
+
+import pygame
 import math
 import random
 import numpy as np
 import csv
-
+import time
 
 # Constants
-WIDTH, HEIGHT = 1200, 800
-CELL_SIZE = 10
-GRID_WIDTH = WIDTH // CELL_SIZE
-GRID_HEIGHT = HEIGHT // CELL_SIZE
-WATER_LEVEL = 0.3
-FPS = 60
+WATER_LEVEL = 0.3  # Ensure consistency with environment.py
 
 class Drone:
-    def __init__(self, id, position, rotor_speed=1.0, color=(255, 0, 0)):
+    def __init__(self, id, position, weather_system, rotor_speed=1.0, color=(255, 0, 0)):
         """
-        Initialize the drone with an ID, initial position, rotor speed, and color.
-        Position is a tuple (x, y).
+        Initialize the drone with an ID, position, rotor speed, color, and reference to WeatherSystem.
         """
         self.id = id
-        self.position = position  # (x, y) tuple
-        self.rotor_speed = rotor_speed  # Speed of the rotor
-        self.weather_forecast = None  # Current weather information
-        self.neighbors = []  # List of nearby drones for information sharing
-        self.color = color  # Color for visualization
-        
-        # Logging attributes
+        self.position = pygame.math.Vector2(position) # (x, y) tuple
+        self.rotor_speed = rotor_speed
+        self.color = color
+        self.neighbors = []
+        self.environment = None  # To be loaded later
+        self.weather_system = weather_system  # Reference to WeatherSystem
         self.log_file = 'drone_stats.csv'
         self.initialize_logging()
-    
+
     def initialize_logging(self):
         """
         Initialize the CSV log file with headers if it doesn't exist.
@@ -40,7 +36,7 @@ class Drone:
         except FileExistsError:
             # File already exists
             pass
-    
+
     def log_action(self, action, details):
         """
         Log drone actions to a CSV file.
@@ -49,57 +45,74 @@ class Drone:
         with open(self.log_file, mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([timestamp, self.id, action, details])
-    
+
     def move(self, dx, dy, drones, collision_radius=10):
         """
-        Move the drone by the given offsets in the x and y directions.
-        Prevent collision with other drones by maintaining a minimum distance.
+        Move the drone by dx and dy, ensuring no collision with other drones.
         """
+        # Update position with delta movement
+        self.position.x += dx * self.rotor_speed
+        self.position.y += dy * self.rotor_speed
+        
+        # Boundary checking to keep drone within screen
+        self.position.x = max(0, min(WIDTH, self.position.x))
+        self.position.y = max(0, min(HEIGHT, self.position.y)) 
+
+
         new_x = self.position[0] + dx
         new_y = self.position[1] + dy
-        
-        # Check for collisions
+
+        # Check for collision
         for drone in drones:
             if drone.id != self.id:
                 distance = math.hypot(new_x - drone.position[0], new_y - drone.position[1])
                 if distance < collision_radius:
                     print(f"Drone {self.id} collision detected with Drone {drone.id}. Movement aborted.")
                     self.log_action("Move Aborted", f"Collision with Drone {drone.id} at position {drone.position}")
-                    return  # Abort movement to avoid collision
-        
+                    return  # Abort movement
+
         # Update position
         self.position = (new_x, new_y)
         print(f"Drone {self.id} moved to {self.position}.")
         self.log_action("Move", f"Moved to {self.position}")
-    
-    def adjust_rotor_speed(self, new_speed):
+
+    def adjust_rotor_speed(self, factor):
         """
-        Adjust the drone's rotor speed based on weather conditions.
+        Adjust the rotor speed based on a factor.
         """
         old_speed = self.rotor_speed
-        self.rotor_speed = max(0.1, min(new_speed, 5.0))  # Keep rotor speed between 0.1 and 5.0
-        print(f"Drone {self.id} rotor speed adjusted from {old_speed} to {self.rotor_speed}.")
-        self.log_action("Rotor Speed Adjustment", f"Adjusted from {old_speed} to {self.rotor_speed}")
-    
-    def set_weather_forecast(self, forecast):
+        self.rotor_speed = max(0.1, min(self.rotor_speed * factor, 5.0))  # Clamp between 0.1 and 5.0
+        print(f"Drone {self.id} rotor speed adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}.")
+        self.log_action("Rotor Speed Adjustment", f"Adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}")
+
+    def update_behavior(self):
         """
-        Update the weather forecast affecting the drone's operations.
+        Update drone behavior based on current weather conditions.
         """
-        old_forecast = self.weather_forecast
-        self.weather_forecast = forecast
-        print(f"Drone {self.id} weather forecast updated from '{old_forecast}' to '{self.weather_forecast}'.")
-        self.log_action("Weather Update", f"Updated from '{old_forecast}' to '{self.weather_forecast}'")
-        
-        # Modify rotor speed based on weather
-        if self.weather_forecast == "Windy":
-            self.adjust_rotor_speed(self.rotor_speed * 1.2)  # Increase rotor speed by 20%
-        elif self.weather_forecast == "Calm":
-            self.adjust_rotor_speed(self.rotor_speed * 0.8)  # Decrease rotor speed by 20%
-        # Add more weather conditions as needed
-    
+        current_weather = self.weather_system.get_current_weather()
+
+        if current_weather is None:
+            print(f"Drone {self.id} has no current weather data.")
+            self.log_action("Behavior Update Failed", "No current weather data")
+            return
+
+        # Adjust rotor speed based on wind speed and precipitation
+        wind_speed = current_weather.wind_speed
+        precipitation = current_weather.precipitation_type
+        intensity = current_weather.intensity
+
+        # Simple logic: Increase rotor speed in high wind or precipitation
+        if wind_speed > 20 or precipitation in ["Rain", "Stormy"]:
+            self.adjust_rotor_speed(1.1)  # Increase by 10%
+        elif wind_speed < 5 and precipitation == "None":
+            self.adjust_rotor_speed(0.9)  # Decrease by 10%
+        else:
+            # Slight adjustment based on intensity
+            self.adjust_rotor_speed(1 + 0.05 * (intensity - 0.5))
+
     def find_neighbors(self, drones, neighbor_radius=100):
         """
-        Identify and update the list of neighboring drones within a specified radius.
+        Find drones within neighbor_radius and update neighbors list.
         """
         self.neighbors = []
         for drone in drones:
@@ -110,70 +123,58 @@ class Drone:
                     self.neighbors.append(drone)
         print(f"Drone {self.id} has {len(self.neighbors)} neighbors.")
         self.log_action("Neighbor Update", f"Found {len(self.neighbors)} neighbors")
-    
+
     def share_information(self):
         """
-        Share information with the nearest neighbors.
+        Share information with neighbors.
         """
         if self.neighbors:
-            info = f"Drone {self.id}: Current position {self.position}"
+            info = f"Drone {self.id}: Position {self.position}"
             for neighbor in self.neighbors:
                 neighbor.receive_information(info)
-            print(f"Drone {self.id} shared information with {len(self.neighbors)} neighbors.")
+            print(f"Drone {self.id} shared info with {len(self.neighbors)} neighbors.")
             self.log_action("Information Sharing", f"Shared info with {len(self.neighbors)} neighbors")
         else:
             print(f"Drone {self.id} has no neighbors to share information with.")
             self.log_action("Information Sharing", "No neighbors to share information with")
-    
+
     def receive_information(self, info):
         """
-        Receive shared information from another drone.
+        Receive information from another drone.
         """
         print(f"Drone {self.id} received info: {info}")
         self.log_action("Information Received", f"Received info: {info}")
-    
+
     def report_status(self):
         """
-        Report the current status of the drone.
+        Report current status.
         """
         status = {
             "id": self.id,
             "position": self.position,
             "rotor_speed": self.rotor_speed,
-            "weather_forecast": self.weather_forecast,
+            "weather_forecast": self.weather_system.current_state.name if self.weather_system.current_state else None,
             "neighbors": [drone.id for drone in self.neighbors]
         }
         print(f"Drone {self.id} Status: {status}")
         self.log_action("Status Report", f"{status}")
         return status
-    
-    def load_environment(self, filename='environment.npy'):
+
+    def load_environment(self, environment):
         """
-        Load the environment data from a .npy file.
+        Load and interact with environment data.
         """
-        try:
-            environment_data = np.load(filename, allow_pickle=True).item()
-            self.environment = environment_data
-            print(f"Drone {self.id} loaded environment data from '{filename}'.")
-            self.log_action("Environment Load", f"Loaded data from '{filename}'")
-        except Exception as e:
-            print(f"Drone {self.id} failed to load environment from '{filename}': {e}")
-            self.log_action("Environment Load Failed", f"Error: {e}")
-            self.environment = None
-    
+        self.environment = environment
+        print(f"Drone {self.id} loaded environment data.")
+        self.log_action("Environment Load", f"Loaded environment data")
+
     def get_environment_info(self):
         """
-        Retrieve specific information from the loaded environment.
+        Retrieve and log information from environment.
         """
-        if self.environment is None:
-            print(f"Drone {self.id} has no environment data loaded.")
-            self.log_action("Get Environment Info", "No environment data loaded")
-            return None
-        
-        grid = self.environment.get('grid', None)
-        buildings = self.environment.get('buildings', None)
-        
-        if grid is not None and buildings is not None:
+        if self.environment is not None:
+            grid = self.environment.get_grid()
+            buildings = self.environment.get_buildings()
             env_info = {
                 "grid_min": grid.min(),
                 "grid_max": grid.max(),
@@ -185,6 +186,6 @@ class Drone:
             self.log_action("Environment Info Retrieved", f"{env_info}")
             return env_info
         else:
-            print(f"Drone {self.id} environment data incomplete.")
-            self.log_action("Environment Info Retrieval Failed", "Incomplete environment data")
+            print(f"Drone {self.id} has no environment data loaded.")
+            self.log_action("Environment Info Retrieval Failed", "No environment data loaded")
             return None

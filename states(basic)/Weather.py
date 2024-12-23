@@ -1,28 +1,33 @@
+# Weather Class
+
 import pygame
 import random
 import math
 import time
 import csv
-from pygame.locals import *
-import json
+# from pygame.locals import *
+# import json
 
-# Initialize Pygame
-pygame.init()
+# # Initialize Pygame
+# pygame.init()
 
 # Screen Dimensions
 WIDTH, HEIGHT = 1200, 800
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Niger Delta Weather Simulation for Drone Oil Spill Detection")
+# screen = pygame.display.set_mode((WIDTH, HEIGHT))
+# pygame.display.set_caption("Niger Delta Weather Simulation for Drone Oil Spill Detection")
 
-# Clock for controlling the frame rate
-clock = pygame.time.Clock()
+# # Clock for controlling the frame rate
+# clock = pygame.time.Clock()
+
+# Frame Rate
+FPS = 60
+
 
 # Colors for Different Weather Conditions
 DAY_COLOR = (135, 206, 235)
 NIGHT_COLOR = (25, 25, 112)
 CLOUD_COLOR = (220, 220, 220)
 RAIN_COLOR = (0, 0, 255)
-SNOW_COLOR = (255, 250, 250)
 FOG_COLOR = (180, 180, 180, 80)
 STORM_COLOR = (50, 50, 50)
 LIGHTNING_COLOR = (255, 255, 255)
@@ -36,11 +41,8 @@ SKY_COLORS = {
     "night": NIGHT_COLOR
 }
 
-# Fonts
-FONT = pygame.font.Font(None, 24)
-
-# Frame Rate
-FPS = 60
+# # Fonts
+# FONT = pygame.font.Font(None, 24)
 
 # Seasons
 SEASONS = ["Rainy", "Dry"]
@@ -224,6 +226,7 @@ class Raindrop:
         self.speed = random.uniform(4, 7)
         self.vx = 0
         self.vy = self.speed
+        self.color = (173, 216, 230, 100)  # Light blue with alpha 100
 
     def update(self, wind_speed, wind_direction):
         """Update the raindrop's position based on wind."""
@@ -532,6 +535,12 @@ class WeatherSystem:
         """Draw visual representations of current weather."""
         weather = self.current_state
 
+        # semi-transparent surface for weather effects
+        weather_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+
+        # Fill with transparent color
+        weather_surface.fill((0, 0, 0, 0))
+
         # Get dynamic sky color
         bg_color = self.get_sky_color()
         surface.fill(bg_color)
@@ -542,117 +551,70 @@ class WeatherSystem:
             brightness_alpha = int(weather.intensity * 100)  # Alpha ranges from 0 (transparent) to 100 (semi-transparent)
             brightness_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             brightness_surface.fill((255, 255, 200, brightness_alpha))  # Slightly yellowish white with variable alpha
-            surface.blit(brightness_surface, (0, 0))
+            weather_surface.blit(brightness_surface, (0, 0))
 
         elif weather.name == "Rainy":
             # Draw raindrops
             for drop in self.raindrops:
-                drop.draw(surface)
+                drop.draw(weather_surface)
+
         elif weather.name == "Foggy":
             # Draw fog overlay
             fog_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             fog_alpha = int(80 * weather.intensity)  # Adjust scaling as needed
             fog_surface.fill((180, 180, 180, fog_alpha))
-            surface.blit(fog_surface, (0, 0))
+            weather_surface.blit(fog_surface, (0, 0))
+
         elif weather.name == "Stormy":
             # Draw storm clouds
             for cloud in self.clouds:
-                cloud.draw(surface)
+                cloud.draw(weather_surface)
             # Draw lightning
-            self.lightning.draw(surface)
+            self.lightning.draw(weather_surface)
         elif weather.name == "Harmattan":
             # Draw hazy overlay
-            haze_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             haze_alpha = int(70 * weather.intensity)
+            haze_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             haze_surface.fill((210, 180, 140, haze_alpha))
-            surface.blit(haze_surface, (0, 0))
+            weather_surface.blit(haze_surface, (0, 0))
 
-        # Optionally, add an overlay based on visibility to simulate reduced visibility
+        # overlay based on visibility to simulate reduced visibility
         if weather.visibility < 1.0:
             visibility_factor = 1.0 - weather.visibility  # Higher factor means lower visibility
             visibility_alpha = int(visibility_factor * 150)  # Adjust scaling as needed
             visibility_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             visibility_overlay.fill((0, 0, 0, visibility_alpha))  # Dark overlay
-            surface.blit(visibility_overlay, (0, 0))
+            weather_surface.blit(visibility_overlay, (0, 0))
 
         # Draw clouds moving across the screen
         if weather.name in ["Sunny", "Rainy", "Foggy", "Stormy", "Harmattan"]:
             for cloud in self.clouds:
-                cloud.draw(surface)
+                cloud.draw(weather_surface)
 
-# Simulation Orchestration
-class Simulation:
-    def __init__(self):
-        self.time_manager = TimeManager()
-        self.weather_system = WeatherSystem(self.time_manager)
-        self.running = True
+        # Blit the semi-transparent weather_surface onto the main surface
+        surface.blit(weather_surface, (0, 0))
 
-    def run(self):
-        while self.running:
-            dt = clock.tick(FPS) / 1000  # Delta time in seconds
+    # def draw_stats(self):
+    #     """Display simulation statistics."""
+    #     y = 10
+    #     weather = self.weather_system.get_current_weather()
+    #     stats = [
+    #         f"Day: {self.time_manager.day_count + 1}",
+    #         f"Time: {self.time_manager.hour:02}:{int(self.time_manager.minute):02}",
+    #         f"Season: {self.time_manager.season}",
+    #         f"Weather: {weather.name}",
+    #         f"Intensity: {weather.intensity:.2f}",
+    #         f"Temperature: {weather.temperature:.1f} °C",
+    #         f"Humidity: {weather.humidity:.1f}%",
+    #         f"Wind Speed: {weather.wind_speed:.1f} m/s",
+    #         f"Wind Direction: {weather.wind_direction:.1f}°",
+    #         f"Precipitation: {weather.precipitation_type}",
+    #         f"Visibility: {weather.visibility:.2f}",
+    #         f"Cloud Density: {weather.cloud_density:.2f}",
+    #         f"Air Pressure: {weather.air_pressure:.1f} hPa"
+    #     ]
 
-            # Handle events
-            self.handle_events()
-
-            # Update simulation components
-            self.time_manager.update(dt)
-            self.weather_system.update(dt)
-
-            # Render everything
-            self.render()
-
-            # Log stats at the end of each hour
-            if self.time_manager.minute == 0 and self.time_manager.hour != 0:
-                self.weather_system.log_weather_stats()
-
-        # After loop ends, close the CSV file
-        self.weather_system.close_csv()
-        pygame.quit()
-
-    def handle_events(self):
-        """Handle user inputs and events."""
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                self.running = False
-            elif event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    self.running = False
-
-    def render(self):
-        """Render all simulation components."""
-        # Render weather effects on the screen
-        self.weather_system.render_weather_effects(screen)
-
-        # Draw UI Stats
-        self.draw_stats()
-
-        pygame.display.flip()
-
-    def draw_stats(self):
-        """Display simulation statistics."""
-        y = 10
-        weather = self.weather_system.get_current_weather()
-        stats = [
-            f"Day: {self.time_manager.day_count + 1}",
-            f"Time: {self.time_manager.hour:02}:{int(self.time_manager.minute):02}",
-            f"Season: {self.time_manager.season}",
-            f"Weather: {weather.name}",
-            f"Intensity: {weather.intensity:.2f}",
-            f"Temperature: {weather.temperature:.1f} °C",
-            f"Humidity: {weather.humidity:.1f}%",
-            f"Wind Speed: {weather.wind_speed:.1f} m/s",
-            f"Wind Direction: {weather.wind_direction:.1f}°",
-            f"Precipitation: {weather.precipitation_type}",
-            f"Visibility: {weather.visibility:.2f}",
-            f"Cloud Density: {weather.cloud_density:.2f}",
-            f"Air Pressure: {weather.air_pressure:.1f} hPa"
-        ]
-
-        for stat in stats:
-            text = FONT.render(stat, True, (255, 255, 255))
-            screen.blit(text, (10, y))
-            y += 20
-
-if __name__ == "__main__":
-    simulation = Simulation()
-    simulation.run()
+        # for stat in stats:
+        #     text = FONT.render(stat, True, (255, 255, 255))
+        #     screen.blit(text, (10, y))
+        #     y += 20
