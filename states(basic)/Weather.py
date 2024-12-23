@@ -388,6 +388,9 @@ class WeatherSystem:
         # Update weather effects
         self.update_weather_effects(dt)
 
+        # Log current weather statistics
+        self.log_weather_stats()
+
     def handle_intensity_changes(self):
         """Gradually increase or decrease the intensity of the current weather state."""
         if self.current_state.intensity >= 0.8:
@@ -474,6 +477,25 @@ class WeatherSystem:
     def get_current_weather(self):
         """Return the current weather state."""
         return self.current_state
+    
+    def log_weather_change(self, new_state):
+        """Log the weather state change."""
+        self.csv_writer.writerow([
+            self.time_manager.day_count + 1,
+            self.time_manager.hour,
+            self.time_manager.season,
+            new_state,
+            f"{self.current_state.intensity:.2f}",
+            f"{self.current_state.temperature:.1f}",
+            f"{self.current_state.humidity:.1f}",
+            f"{self.current_state.wind_speed:.1f}",
+            f"{self.current_state.wind_direction:.1f}",
+            self.current_state.precipitation_type,
+            f"{self.current_state.visibility:.2f}",
+            f"{self.current_state.cloud_density:.2f}",
+            f"{self.current_state.air_pressure:.1f}"
+        ])
+        self.csv_file.flush()
 
     def log_weather_stats(self):
         """Log the current weather statistics to the CSV file."""
