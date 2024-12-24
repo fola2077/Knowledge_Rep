@@ -9,15 +9,6 @@ from pygame.locals import *
 import json
 from config import WIDTH, HEIGHT
 
-# # Initialize Pygame
-# pygame.init()
-
-# Screen Dimensions
-# screen = pygame.display.set_mode((WIDTH, HEIGHT))
-# pygame.display.set_caption("Niger Delta Weather Simulation for Drone Oil Spill Detection")
-
-# # Clock for controlling the frame rate
-# clock = pygame.time.Clock()
 
 # Frame Rate
 FPS = 60
