@@ -31,6 +31,16 @@ blue_shades = [
 pygame.font.init()
 FONT = pygame.font.Font(None, 24)
 
+# Configure logging for main.py
+import logging
+
+logging.basicConfig(
+    filename='main.log',
+    filemode='w',  # Overwrite log file each run
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 def main():
     # Initialize Pygame
     pygame.init()
@@ -42,6 +52,8 @@ def main():
     environment = Environment()
     time_manager = TimeManager()
     weather_system = WeatherSystem(time_manager)
+
+    logging.info("Simulation started.")
 
     # Initialize drones
     num_drones = 5
@@ -65,9 +77,10 @@ def main():
         drones.append(drone)
         print(f"Drone {i} initialized at position {drone.position}.")
 
+    environment.drones = drones  # If environment.py utilizes this
+
     # Create separate surfaces
     environment_surface = pygame.Surface((WIDTH, HEIGHT))
-    # weather_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)  # Allows transparency
 
     # Simulation loop
     running = True
@@ -154,13 +167,7 @@ def main():
                     # Draw water based on elevation
                     shade = blue_shades[min(int(elevation / WATER_LEVEL * (len(blue_shades) - 1)), len(blue_shades)-1)]
                     pygame.draw.rect(environment_surface, shade, rect)
-                    # pygame.draw.rect(environment_surface, (0, 0, 255), rect)
-                # elif elevation > WATER_LEVEL - 0.1:
-                #     # Shallow water can be represented if needed
-                #     pass
-                # else:
-                #     # Deep water can be represented if needed
-                #     pass
+
 
         # Draw grid lines on environment_surface
         for x in range(0, WIDTH, CELL_SIZE):
@@ -177,18 +184,18 @@ def main():
 
         # Draw drones on environment_surface
         for drone in drones:
-            pygame.draw.circle(environment_surface, drone.color, (int(drone.position[0]), int(drone.position[1])), 5)
+            pygame.draw.circle(
+                environment_surface, 
+                drone.color, 
+                (int(drone.position.x), int(drone.position.y)), 
+                5
+            )
             # Optionally, draw drone ID
             id_text = FONT.render(str(drone.id), True, INFO_COLOR)
             environment_surface.blit(id_text, (drone.position[0] + 5, drone.position[1] - 10))
 
-        # # Render weather effects on weather_surface
-        # weather_surface.fill((0, 0, 0, 0))  # Clear previous weather
-        # weather_system.render_weather_effects(weather_surface)
-
         # # Blit environment_surface and then weather_surface onto the main screen
         screen.blit(environment_surface, (0, 0))
-        # screen.blit(weather_surface, (0, 0))  # Weather overlays on top
 
         # Draw UI elements directly on the main screen
         instructions = [

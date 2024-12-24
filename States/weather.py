@@ -32,8 +32,6 @@ SKY_COLORS = {
     "night": NIGHT_COLOR
 }
 
-# # Fonts
-# FONT = pygame.font.Font(None, 24)
 
 # Seasons
 SEASONS = ["Rainy", "Dry"]
@@ -607,27 +605,4 @@ class WeatherSystem:
         # Blit the semi-transparent weather_surface onto the main surface
         surface.blit(weather_surface, (0, 0))
 
-    # def draw_stats(self):
-    #     """Display simulation statistics."""
-    #     y = 10
-    #     weather = self.weather_system.get_current_weather()
-    #     stats = [
-    #         f"Day: {self.time_manager.day_count + 1}",
-    #         f"Time: {self.time_manager.hour:02}:{int(self.time_manager.minute):02}",
-    #         f"Season: {self.time_manager.season}",
-    #         f"Weather: {weather.name}",
-    #         f"Intensity: {weather.intensity:.2f}",
-    #         f"Temperature: {weather.temperature:.1f} °C",
-    #         f"Humidity: {weather.humidity:.1f}%",
-    #         f"Wind Speed: {weather.wind_speed:.1f} m/s",
-    #         f"Wind Direction: {weather.wind_direction:.1f}°",
-    #         f"Precipitation: {weather.precipitation_type}",
-    #         f"Visibility: {weather.visibility:.2f}",
-    #         f"Cloud Density: {weather.cloud_density:.2f}",
-    #         f"Air Pressure: {weather.air_pressure:.1f} hPa"
-    #     ]
 
-        # for stat in stats:
-        #     text = FONT.render(stat, True, (255, 255, 255))
-        #     screen.blit(text, (10, y))
-        #     y += 20
