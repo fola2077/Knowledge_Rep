@@ -6,6 +6,16 @@ import random
 import numpy as np
 import csv
 import time
+import pygame
+from pygame.math import Vector2
+from config import WIDTH, HEIGHT
+
+
+# Cell size and Frames Per Second
+CELL_SIZE = 10
+FPS = 60
+
+
 
 # Constants
 WATER_LEVEL = 0.3  # Ensure consistency with environment.py
@@ -16,7 +26,7 @@ class Drone:
         Initialize the drone with an ID, position, rotor speed, color, and reference to WeatherSystem.
         """
         self.id = id
-        self.position = pygame.math.Vector2(position) # (x, y) tuple
+        self.position = Vector2(position) # (x, y) tuple
         self.rotor_speed = rotor_speed
         self.color = color
         self.neighbors = []
@@ -48,33 +58,37 @@ class Drone:
 
     def move(self, dx, dy, drones, collision_radius=10):
         """
-        Move the drone by dx and dy, ensuring no collision with other drones.
-        """
-        # Update position with delta movement
-        self.position.x += dx * self.rotor_speed
-        self.position.y += dy * self.rotor_speed
+        Move the drone by dx and dy, ensuring no collision with other drones and staying within boundaries.
         
-        # Boundary checking to keep drone within screen
-        self.position.x = max(0, min(WIDTH, self.position.x))
-        self.position.y = max(0, min(HEIGHT, self.position.y)) 
+        Parameters:
+            dx (float): Movement in the x-direction.
+            dy (float): Movement in the y-direction.
+            drones (list): List of all drone instances.
+            collision_radius (float): Minimum allowed distance between drones to avoid collision.
+        """
+        # Calculate the movement vector scaled by rotor speed
+        movement = Vector2(dx, dy) * self.rotor_speed
 
+        # Calculate the proposed new position
+        proposed_position = self.position + movement
 
-        new_x = self.position[0] + dx
-        new_y = self.position[1] + dy
+        # Boundary checking: Clamp the proposed position within the screen limits
+        proposed_position.x = max(0, min(WIDTH, proposed_position.x))
+        proposed_position.y = max(0, min(HEIGHT, proposed_position.y))
 
-        # Check for collision
+        # Collision checking: Ensure no other drone is within the collision radius
         for drone in drones:
             if drone.id != self.id:
-                distance = math.hypot(new_x - drone.position[0], new_y - drone.position[1])
+                distance = proposed_position.distance_to(drone.position)
                 if distance < collision_radius:
                     print(f"Drone {self.id} collision detected with Drone {drone.id}. Movement aborted.")
-                    self.log_action("Move Aborted", f"Collision with Drone {drone.id} at position {drone.position}")
-                    return  # Abort movement
+                    self.log_action("Move Aborted", f"Collision with Drone {drone.id} at position ({drone.position.x:.2f}, {drone.position.y:.2f})")
+                    return  # Abort movement if collision is detected
 
-        # Update position
-        self.position = (new_x, new_y)
-        print(f"Drone {self.id} moved to {self.position}.")
-        self.log_action("Move", f"Moved to {self.position}")
+        # No collision detected; update the drone's position
+        self.position = proposed_position
+        print(f"Drone {self.id} moved to ({self.position.x:.2f}, {self.position.y:.2f}).")
+        self.log_action("Move", f"Moved to ({self.position.x:.2f}, {self.position.y:.2f})")
 
     def adjust_rotor_speed(self, factor):
         """

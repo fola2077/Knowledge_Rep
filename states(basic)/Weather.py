@@ -5,14 +5,14 @@ import random
 import math
 import time
 import csv
-# from pygame.locals import *
-# import json
+from pygame.locals import *
+import json
+from config import WIDTH, HEIGHT
 
 # # Initialize Pygame
 # pygame.init()
 
 # Screen Dimensions
-WIDTH, HEIGHT = 1200, 800
 # screen = pygame.display.set_mode((WIDTH, HEIGHT))
 # pygame.display.set_caption("Niger Delta Weather Simulation for Drone Oil Spill Detection")
 

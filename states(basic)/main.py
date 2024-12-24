@@ -7,9 +7,9 @@ import numpy as np
 from drone import Drone
 from environment import Environment, WATER_LEVEL
 from weather import WeatherSystem, TimeManager
+from config import WIDTH, HEIGHT
 
-# Constants
-WIDTH, HEIGHT = 1200, 800
+# # Constants
 CELL_SIZE = 10
 FPS = 60
 

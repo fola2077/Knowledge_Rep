@@ -7,9 +7,29 @@ from scipy.ndimage import gaussian_filter
 import sys
 import csv
 import time
+from config import WIDTH, HEIGHT
 
 # Constants
 WATER_LEVEL = 0.3 # Ensure consistency with drone.py
+
+# Cell size and Frames Per Second
+CELL_SIZE = 10
+FPS = 60
+
+# Colors
+LAND_COLOR = (34, 139, 34)            # Land
+BUILDING_COLOR = (139, 69, 19)        # Buildings
+GRID_LINES_COLOR = (200, 200, 200)    # Grid lines
+HIGHLIGHT_COLOR = (255, 255, 255)     # Highlight color for buildings
+DRONE_COLOR = (255, 0, 0)             # Red color for drones
+INFO_COLOR = (255, 255, 255)          # White color for info text
+WATER_COLOR = (0, 0, 255)             # Blue color for water
+
+blue_shades = [
+    (0, 0, 139),      # Dark Blue
+    (0, 0, 205),      # Medium Blue
+    (0, 0, 255)       # Blue
+]
 
 
 class Environment:
@@ -25,6 +45,7 @@ class Environment:
         self.log_file = 'environment_log.csv'
         self.initialize_logging()
         self.print_grid_stats()
+        self.drones = []
     
     def generate_grid(self):
         grid = np.zeros((self.grid_width, self.grid_height))
