@@ -1,93 +1,174 @@
-import pygame
+# oil_spillage.py
+
 import numpy as np
+import random
+import math
+import logging
 
-# Constants for visualization
-WINDOW_SIZE = 500
-DRONE_RADIUS = 10
-SPILL_RADIUS = 15
-DETECTION_RADIUS = 50
-FPS = 30
+from config import WIDTH, HEIGHT, CELL_SIZE
 
-class DroneEnvironment:
-    def __init__(self, num_drones=3, num_spillages=5):
-        self.num_drones = num_drones
-        self.num_spillages = num_spillages
-        self.drones = []
-        self.spillages = []
-        self.done = False
+class OilSpillage:
+    def __init__(self, environment, start_position, volume, oil_type='Light Crude'):
+        """
+        Initialize the oil spillage event.
 
-        # Initialize Pygame
-        pygame.init()
-        self.screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE))
-        pygame.display.set_caption("Drone Oil Spillage Detection")
-        self.clock = pygame.time.Clock()
+        Parameters:
+            environment: The Environment instance.
+            start_position: Tuple (x, y) in pixels where the spill originates.
+            volume: The initial volume of the oil spill (arbitrary units).
+            oil_type: Type of oil spilled, affecting spread and weathering.
+        """
+        self.environment = environment
+        self.start_position = start_position  # Position in pixels
+        self.volume = volume
+        self.oil_type = oil_type
+        self.time_elapsed = 0  # Time since spill started
+        self.grid = np.zeros_like(environment.grid)  # Oil concentration grid matching environment
+        self.spread_rate = self.calculate_spread_rate(oil_type)
+        self.evaporation_rate = self.calculate_evaporation_rate(oil_type)
+        self.logger = logging.getLogger('OilSpillage')
+        self.initialize_spill()
 
-        # Initialize drones and spillages
-        self.initialize_drones()
-        self.initialize_spillages()
+    def initialize_spill(self):
+        """
+        Place the initial oil concentration on the grid.
+        """
+        grid_x = int(self.start_position[0] // CELL_SIZE)
+        grid_y = int(self.start_position[1] // CELL_SIZE)
+        if 0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height:
+            self.grid[grid_x, grid_y] = self.volume
+            self.logger.info(f"Oil spill initialized at grid cell ({grid_x}, {grid_y}) with volume {self.volume}.")
+            print(f"Oil spill volume set at grid cell ({grid_x}, {grid_y})")
+        else:
+            self.logger.error("Oil spill start position is out of bounds.")
+            print("Error: Oil spill start position is out of bounds.")
 
-    def initialize_drones(self):
-        """Initialize drones at random positions."""
-        self.drones = [np.random.uniform(0, WINDOW_SIZE, 2) for _ in range(self.num_drones)]
+    def calculate_spread_rate(self, oil_type):
+        """
+        Calculate the spread rate based on the oil type.
+        """
+        # Simplified spread rate; you can adjust based on oil type
+        if oil_type == 'Light Crude':
+            return 0.1
+        elif oil_type == 'Heavy Crude':
+            return 0.05
+        else:
+            return 0.08  # Default spread rate
 
-    def initialize_spillages(self):
-        """Initialize oil spillages at random positions."""
-        self.spillages = [{"position": np.random.uniform(0, WINDOW_SIZE, 2), "detected": False} for _ in range(self.num_spillages)]
+    def calculate_evaporation_rate(self, oil_type):
+        """
+        Calculate the evaporation rate based on the oil type.
+        """
+        if oil_type == 'Light Crude':
+            return 0.02
+        elif oil_type == 'Heavy Crude':
+            return 0.005
+        else:
+            return 0.01  # Default evaporation rate      
 
-    def reset(self):
-        """Reset the environment."""
-        self.initialize_drones()
-        for spillage in self.spillages:
-            spillage["detected"] = False
+    def update(self, dt, weather_system):
+        """
+        Update the oil spill over time.
 
-    def step(self, actions):
-        """Move drones and check for oil spillage detection."""
-        rewards = []
-        for i, action in enumerate(actions):
-            if action == 1: self.drones[i][1] -= 5  # Move up
-            elif action == 2: self.drones[i][1] += 5  # Move down
-            elif action == 3: self.drones[i][0] -= 5  # Move left
-            elif action == 4: self.drones[i][0] += 5  # Move right
+        Parameters:
+            dt: Time delta since the last update (seconds).
+            weather_system: The WeatherSystem instance.
+        """
+        self.time_elapsed += dt
+        self.spread_oil(dt, weather_system)
+        self.weather_oil(dt, weather_system)
+        max_conc = np.max(self.grid)
+        print(f"Oil spill update - Time: {self.time_elapsed:.2f}s, Max concentration: {max_conc}")
 
-            # Keep drones within bounds
-            self.drones[i] = np.clip(self.drones[i], 0, WINDOW_SIZE)
+    def spread_oil(self, dt, weather_system):
+        """
+        Simulate the spreading of oil on the grid.
 
-            # Check for spillage detection
-            reward = 0
-            for spillage in self.spillages:
-                if not spillage["detected"]:
-                    distance = np.linalg.norm(self.drones[i] - spillage["position"])
-                    if distance <= DETECTION_RADIUS:
-                        spillage["detected"] = True
-                        reward += 10
-            rewards.append(reward)
+        Parameters:
+            dt: Time delta since the last update (seconds).
+            weather_system: The WeatherSystem instance.
+        """
+        # Diffusion component
+        diffusion_coefficient = self.spread_rate
+        self.grid = self.diffuse(self.grid, diffusion_coefficient, dt)
 
-        return self.get_state(), rewards, self.done, {}
+        # Advection component (wind effect)
+        wind_speed = weather_system.current_state.wind_speed
+        wind_direction = weather_system.current_state.wind_direction
+        self.grid = self.advect(self.grid, wind_speed, wind_direction, dt)
 
-    def get_state(self):
-        """Return the current positions of the drones."""
-        return np.array(self.drones)
+    def diffuse(self, grid, diffusion_coefficient, dt):
+        """
+        Apply diffusion to the oil concentration grid.
 
-    def render(self):
-        """Render the environment using Pygame."""
-        self.screen.fill((255, 255, 255))  # Clear screen with white background
+        Parameters:
+            grid: Current oil concentration grid.
+            diffusion_coefficient: Rate at which oil diffuses over the grid.
+            dt: Time delta (seconds).
+        """
+        # Simple diffusion using convolution with a kernel
+        kernel_size = 3
+        scaling_factor = 10  # Adjust based on grid size
+        kernel = np.ones((kernel_size, kernel_size)) / (kernel_size ** 2)
+        diffused_grid = grid + diffusion_coefficient * dt * scaling_factor * self.convolve(grid, kernel)
+        return diffused_grid
 
-        # Draw oil spillages
-        for spillage in self.spillages:
-            color = (255, 0, 0) if not spillage["detected"] else (0, 255, 0)  # Red for undetected, Green for detected
-            pygame.draw.circle(self.screen, color, spillage["position"].astype(int), SPILL_RADIUS)
+    def convolve(self, grid, kernel):
+        """
+        Apply convolution to the grid with given kernel.
 
-        # Draw drones
-        for drone in self.drones:
-            pygame.draw.circle(self.screen, (0, 0, 255), drone.astype(int), DRONE_RADIUS)
+        Parameters:
+            grid: Grid to convolve.
+            kernel: Convolution kernel.
+        """
+        from scipy.ndimage import convolve
+        return convolve(grid, kernel, mode='constant', cval=0.0)
 
-        # Draw detection radius
-        for drone in self.drones:
-            pygame.draw.circle(self.screen, (0, 0, 255, 50), drone.astype(int), DETECTION_RADIUS, 1)
+    def advect(self, grid, wind_speed, wind_direction, dt):
+        """
+        Apply advection to the oil concentration grid based on wind.
 
-        pygame.display.flip()
-        self.clock.tick(FPS)
+        Parameters:
+            grid: Current oil concentration grid.
+            wind_speed: Speed of the wind (m/s).
+            wind_direction: Direction of the wind (degrees).
+            dt: Time delta (seconds).
+        """
+        # Calculate shift in x and y based on wind speed and direction
+        angle_rad = math.radians(wind_direction)
+        advection_scaling = 0.5 # Adjust based on grid size
+        dx = np.cos(angle_rad) * wind_speed * dt * advection_scaling 
+        dy = np.sin(angle_rad) * wind_speed * dt * advection_scaling
 
-    def close(self):
-        """Close the Pygame window."""
-        pygame.quit()
+        dx_int = int(round(dx))
+        dy_int = int(round(dy))
+
+        shifted_grid = np.roll(grid, shift=dx_int, axis=0)
+        shifted_grid = np.roll(shifted_grid, shift=dy_int, axis=1)
+
+        # Apply boundary conditions
+        if dx > 0:
+            shifted_grid[:int(dx), :] = 0
+        elif dx < 0:
+            shifted_grid[int(dx):, :] = 0
+        if dy > 0:
+            shifted_grid[:, :int(dy)] = 0
+        elif dy < 0:
+            shifted_grid[:, int(dy):] = 0
+
+        return shifted_grid
+    
+    def weather_oil(self, dt, weather_system):
+        """
+        Simulate weathering processes like evaporation.
+
+        Parameters:
+            dt: Time delta (seconds).
+            weather_system: The WeatherSystem instance.
+        """
+        # Evaporation reduces oil volume
+        temperature = weather_system.current_state.temperature  # °C
+        evaporation_factor = self.evaporation_rate * (1 + (temperature - 15) / 100)  # Adjust based on temperature
+        self.grid -= self.grid * evaporation_factor * dt
+        self.grid = np.maximum(self.grid, 0)  # Ensure no negative concentrations
+

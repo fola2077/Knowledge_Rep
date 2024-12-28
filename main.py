@@ -8,6 +8,7 @@ import logging
 from drone import Drone
 from environment import Environment, WATER_LEVEL
 from weather import WeatherSystem, TimeManager
+from oilspillage import OilSpillage
 from config import WIDTH, HEIGHT
 
 # Constants
@@ -94,6 +95,28 @@ def render_static_environment(environment_surface, environment):
                 rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                 pygame.draw.rect(environment_surface, (255, 255, 255), rect, 1)  # HIGHLIGHT_COLOR
 
+# Function Definitions
+
+def render_oil_spill(environment_surface, environment):
+    if environment.oil_spill:
+        oil_concentration_grid = environment.oil_spill.grid
+        max_concentration = np.max(oil_concentration_grid)
+        print(f"Rendering oil spill: Max concentration {max_concentration}")
+        if max_concentration > 0:
+            # Use a fixed color for visibility testing
+            oil_color = (255, 0, 0)  # Bright red
+            
+            for x in range(environment.grid_width):
+                for y in range(environment.grid_height):
+                    if environment.oil_spill.grid[x, y] > 0:
+                        rect = pygame.Rect(
+                            x * CELL_SIZE,
+                            y * CELL_SIZE,
+                            CELL_SIZE,
+                            CELL_SIZE
+                        )
+                        pygame.draw.rect(environment_surface, oil_color, rect)
+
 def main():
     # Initialize Pygame
     pygame.init()
@@ -139,6 +162,17 @@ def main():
     environment_surface = pygame.Surface((WIDTH, HEIGHT))
     render_static_environment(environment_surface, environment)
 
+    # Initialize oil spill
+    oil_spill = OilSpillage(
+        environment=environment,
+        start_position=(WIDTH // 2, HEIGHT // 2),  # Starting at the center
+        volume=5000,  # Arbitrary units
+        oil_type='Light Crude'
+    )
+    environment.add_oil_spill(oil_spill)
+
+
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0  # Delta time in seconds
@@ -151,6 +185,9 @@ def main():
         # Update simulation time and weather
         time_manager.update(dt)
         weather_system.update(dt)
+
+        # Update oil spill
+        oil_spill.update(dt, weather_system)
 
         # Update drones: find neighbors, share information, and adjust behavior based on weather
         for drone in drones:
@@ -169,10 +206,15 @@ def main():
             dx = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt) # movement is proportional to time elapsed
             dy = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt) # movement is proportional to time elapsed
             drone.move(dx, dy, drones)
+            # Drones detect oil spill
+            drone.detect_oil()
 
         # Rendering
         # Clear environment_surface by re-rendering static environment
         render_static_environment(environment_surface, environment)
+
+        # Render oil spill
+        render_oil_spill(environment_surface, environment)
 
         # Draw drones on environment_surface
         for drone in drones:

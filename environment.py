@@ -34,6 +34,7 @@ class Environment:
         self.max_radius = max_radius
         self.num_buildings = num_buildings
         self.cell_size = 10  # Ensure consistency with main.py
+        self.oil_spill = None  # Initialize with no oil spill
 
         # Set up a module-specific logger
         self.logger = logging.getLogger('Environment')
@@ -111,6 +112,15 @@ class Environment:
 
     def get_buildings(self):
         return self.buildings
+    
+    def add_oil_spill(self, oil_spill):
+        """
+        Add an oil spill to the environment.
+
+        Parameters:
+            oil_spill: An instance of OilSpillage.
+        """
+        self.oil_spill = oil_spill
 
     def save_environment(self, drones, filename='environment.npy'):
         """

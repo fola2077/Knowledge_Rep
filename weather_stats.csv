@@ -1,6 +1,2 @@
 Day,Hour,Season,Weather,Intensity,Temperature (°C),Humidity (%),Wind Speed (m/s),Wind Direction (°),Precipitation,Visibility,Cloud Density,Air Pressure (hPa)
-1,6,Rainy,Rainy,0.50,24.8,92.9,16.2,91.2,Rain,0.38,0.70,1047.3
-1,7,Rainy,Rainy,0.51,24.8,92.9,16.2,88.6,Rain,0.38,0.70,1047.3
-1,8,Rainy,Rainy,0.44,24.8,92.9,16.2,82.0,Rain,0.40,0.70,1047.3
-1,9,Rainy,Rainy,0.44,24.8,92.9,16.2,87.0,Rain,0.40,0.70,1047.3
-1,10,Rainy,Rainy,0.44,24.8,92.9,16.2,88.8,Rain,0.40,0.70,1047.3
+1,6,Rainy,Rainy,0.50,21.7,87.7,18.0,280.0,Rain,0.38,0.70,982.3

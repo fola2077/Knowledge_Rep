@@ -7,7 +7,7 @@ import csv
 import time
 import pygame
 from pygame.math import Vector2
-from config import WIDTH, HEIGHT
+from config import WIDTH, HEIGHT, CELL_SIZE
 import logging
 
 class Drone:
@@ -41,7 +41,7 @@ class Drone:
         try:
             with open(self.log_file, mode='w', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow(['Timestamp', 'Drone_ID', 'Action', 'Details'])
+                writer.writerow(['Timestamp', 'Drone_ID', 'Position_X', 'Position_Y'])
         except FileExistsError:
             # File already exists
             pass
@@ -51,10 +51,15 @@ class Drone:
         Log drone actions to a CSV file and the drone-specific log file.
         """
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        with open(self.log_file, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([timestamp, self.id, action, details])
-        self.logger.info(f"{action} - {details}")
+        if action =="Move":
+            with open(self.log_file, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                            # Extract position data from details
+                position_str = details.split("Moved to ")[1].strip("()")
+                pos_x, pos_y = position_str.split(", ")
+                writer.writerow([timestamp, self.id, float(pos_x), float(pos_y)])
+        #     writer.writerow([timestamp, self.id, action, details])
+        # self.logger.info(f"{action} - {details}")
 
     def to_dict(self):
         """
@@ -119,7 +124,7 @@ class Drone:
         old_speed = self.rotor_speed
         self.rotor_speed = max(0.1, min(self.rotor_speed * factor, 5.0))  # Clamp between 0.1 and 5.0
         print(f"Drone {self.id} rotor speed adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}.")
-        self.log_action("Rotor Speed Adjustment", f"Adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}")
+        # self.log_action("Rotor Speed Adjustment", f"Adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}")
 
     def update_behavior(self):
         """
@@ -129,7 +134,7 @@ class Drone:
 
         if current_weather is None:
             print(f"Drone {self.id} has no current weather data.")
-            self.log_action("Behavior Update Failed", "No current weather data")
+            # self.log_action("Behavior Update Failed", "No current weather data")
             return
 
         # Adjust rotor speed based on wind speed and precipitation
@@ -157,7 +162,7 @@ class Drone:
                 if distance <= neighbor_radius:
                     self.neighbors.append(drone)
         print(f"Drone {self.id} has {len(self.neighbors)} neighbors.")
-        self.log_action("Neighbor Update", f"Found {len(self.neighbors)} neighbors")
+        # self.log_action("Neighbor Update", f"Found {len(self.neighbors)} neighbors")
 
     def share_information(self):
         """
@@ -171,14 +176,14 @@ class Drone:
             self.log_action("Information Sharing", f"Shared info with {len(self.neighbors)} neighbors")
         else:
             print(f"Drone {self.id} has no neighbors to share information with.")
-            self.log_action("Information Sharing", "No neighbors to share information with")
+            # self.log_action("Information Sharing", "No neighbors to share information with")
 
     def receive_information(self, info):
         """
         Receive information from another drone.
         """
         print(f"Drone {self.id} received info: {info}")
-        self.log_action("Information Received", f"Received info: {info}")
+        # self.log_action("Information Received", f"Received info: {info}")
 
     def report_status(self):
         """
@@ -192,7 +197,7 @@ class Drone:
             "neighbors": [drone.id for drone in self.neighbors]
         }
         print(f"Drone {self.id} Status: {status}")
-        self.log_action("Status Report", f"{status}")
+        # self.log_action("Status Report", f"{status}")
         return status
 
     def load_environment(self, environment):
@@ -201,7 +206,7 @@ class Drone:
         """
         self.environment = environment
         print(f"Drone {self.id} loaded environment data.")
-        self.log_action("Environment Load", f"Loaded environment data")
+        # self.log_action("Environment Load", f"Loaded environment data")
 
     def get_environment_info(self):
         """
@@ -218,9 +223,27 @@ class Drone:
                 "total_buildings": np.sum(buildings > 0)
             }
             print(f"Drone {self.id} Environment Info: {env_info}")
-            self.log_action("Environment Info Retrieved", f"{env_info}")
+            # self.log_action("Environment Info Retrieved", f"{env_info}")
             return env_info
         else:
             print(f"Drone {self.id} has no environment data loaded.")
-            self.log_action("Environment Info Retrieval Failed", "No environment data loaded")
+            # self.log_action("Environment Info Retrieval Failed", "No environment data loaded")
             return None
+
+    def detect_oil(self, detection_threshold=10):
+        """
+        Detect if oil is present at the drone's current location.
+
+        Parameters:
+            detection_threshold: Oil concentration threshold for detection.
+        """
+        if self.environment and self.environment.oil_spill:
+            grid_x = int(self.position.x // CELL_SIZE)
+            grid_y = int(self.position.y // CELL_SIZE)
+            if 0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height:
+                oil_concentration = self.environment.oil_spill.grid[grid_x, grid_y]
+                if oil_concentration > detection_threshold:
+                    print(f"Drone {self.id} detected oil at ({grid_x}, {grid_y}) with concentration {oil_concentration:.2f}")
+                    self.log_action('Oil Detected', f"Detected at grid ({grid_x}, {grid_y})")
+                    # Implement response, e.g., logging, alerting, adjusting behavior
+    
