@@ -39,7 +39,7 @@ class Drone:
         Initialize the CSV log file with headers if it doesn't exist.
         """
         try:
-            with open(self.log_file, mode='x', newline='') as file:
+            with open(self.log_file, mode='w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(['Timestamp', 'Drone_ID', 'Action', 'Details'])
         except FileExistsError:

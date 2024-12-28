@@ -327,6 +327,9 @@ class WeatherSystem:
             }
         }
 
+        # Initialize logging attributes
+        self.last_logged_hour = None  # Keep track of the last hour logged
+
         # Transition settings
         self.transition_timer = 0
         self.transition_interval = 60  # Seconds between potential transitions
@@ -377,8 +380,11 @@ class WeatherSystem:
         # Update weather effects
         self.update_weather_effects(dt)
 
-        # Log current weather statistics
-        self.log_weather_stats()
+        # Log current weather statistics at each new hour
+        current_hour = self.time_manager.hour
+        if self.last_logged_hour != current_hour:
+            self.log_weather_stats()
+            self.last_logged_hour = current_hour
 
     def handle_intensity_changes(self):
         """Gradually increase or decrease the intensity of the current weather state."""
@@ -505,16 +511,18 @@ class WeatherSystem:
                     f"{self.current_state.cloud_density:.2f}",
                     f"{self.current_state.air_pressure:.1f}"
                 ])
+                # Data is flushed to the file after each hour
+                self.csv_file.flush()
             except IOError as e:
                 print(f"Failed to write to CSV file: {e}")
 
-    def close_csv(self):
-        """Close the CSV file."""
-        if self.csv_file:
-            try:
-                self.csv_file.close()
-            except IOError as e:
-                print(f"Failed to close CSV file: {e}")
+    # def close_csv(self):
+    #     """Close the CSV file."""
+    #     if self.csv_file:
+    #         try:
+    #             self.csv_file.close()
+    #         except IOError as e:
+    #             print(f"Failed to close CSV file: {e}")
 
     def update_weather_effects(self, dt):
         """Update dynamic weather effects like rain and lightning."""

@@ -15,14 +15,16 @@ CELL_SIZE = 10
 FPS = 60
 
 # Colors
-DRONE_COLOR = (255, 0, 0)             # Red color for drones
-INFO_COLOR = (255, 255, 255)          # White color for info text
+DRONE_COLOR = (255, 165, 0)     # Red color for drones
+INFO_COLOR = (255, 255, 255)  # White color for info text
 
 blue_shades = [
     (0, 0, 139),      # Dark Blue
     (0, 0, 205),      # Medium Blue
     (0, 0, 255)       # Blue
 ]
+
+DRONE_SPEED_FACTOR = 0.95 # Speed factor for drones
 
 # Initialize Pygame fonts
 pygame.font.init()
@@ -159,9 +161,13 @@ def main():
 
         for drone in drones:
             drone.update_behavior()
+
+            # Define base movement per second
+            movement_per_second = CELL_SIZE * DRONE_SPEED_FACTOR
+
             # Example movement: random movement within cell size
-            dx = random.randint(-CELL_SIZE, CELL_SIZE)
-            dy = random.randint(-CELL_SIZE, CELL_SIZE)
+            dx = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt) # movement is proportional to time elapsed
+            dy = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt) # movement is proportional to time elapsed
             drone.move(dx, dy, drones)
 
         # Rendering
