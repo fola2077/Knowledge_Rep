@@ -100,3 +100,108 @@ Timestamp,Action,Details
 2024-12-27 21:23:56,Grid Stats Printed,Printed grid statistics to console.
 2024-12-27 21:24:00,Grid Stats Printed,Printed grid statistics to console.
 2024-12-27 21:24:34,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:26:42,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:26:55,Save Environment,environment.npy
+2024-12-27 21:32:49,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:32:53,Save Environment,environment.npy
+2024-12-27 21:32:57,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:33:01,Save Environment,environment.npy
+2024-12-27 21:33:04,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:33:06,Save Environment,environment.npy
+2024-12-27 21:47:08,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:47:16,Save Environment,environment.npy
+2024-12-27 21:47:20,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:47:51,Save Environment,environment.npy
+2024-12-27 21:47:55,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 21:48:03,Save Environment,environment.npy
+2024-12-27 22:05:59,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:05:59,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:05:59,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:05:59,Save Environment,environment.npy
+2024-12-27 22:05:59,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:06:04,Save Environment,environment.npy
+2024-12-27 22:06:09,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:06:09,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:06:09,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:06:09,Save Environment,environment.npy
+2024-12-27 22:06:09,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:06:15,Save Environment,environment.npy
+2024-12-27 22:06:21,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:06:21,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:06:21,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:06:21,Save Environment,environment.npy
+2024-12-27 22:06:21,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:06:26,Save Environment,environment.npy
+2024-12-27 22:07:26,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:07:26,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:07:26,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:07:26,Save Environment,environment.npy
+2024-12-27 22:07:26,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:07:29,Add Building,"Location: (92, 28)"
+2024-12-27 22:07:33,Save Environment,environment.npy
+2024-12-27 22:07:43,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:07:43,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:07:43,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:07:43,Save Environment,environment.npy
+2024-12-27 22:07:43,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:07:52,Save Environment,environment.npy
+2024-12-27 22:08:32,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:08:32,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:08:32,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:08:32,Save Environment,environment.npy
+2024-12-27 22:08:32,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:08:36,Save Environment,environment.npy
+2024-12-27 22:08:40,Environment Loaded,Loaded from 'environment.npy'
+2024-12-27 22:08:40,Load Failed,Failed to load from 'environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:08:40,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:08:40,Save Environment,environment.npy
+2024-12-27 22:08:40,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:08:44,Save Environment,environment.npy
+2024-12-27 22:17:48,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:17:48,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:17:48,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:17:48,Save Environment,environment.npy
+2024-12-27 22:17:48,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:17:50,Save Environment,environment.npy
+2024-12-27 22:17:56,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:17:56,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:17:56,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:17:56,Save Environment,environment.npy
+2024-12-27 22:17:56,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:18:00,Save Environment,environment.npy
+2024-12-27 22:18:02,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:18:02,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:18:02,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:18:02,Save Environment,environment.npy
+2024-12-27 22:18:02,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:18:04,Save Environment,environment.npy
+2024-12-27 22:18:50,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:18:50,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:18:50,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:18:50,Save Environment,environment.npy
+2024-12-27 22:18:50,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:18:55,Save Environment,environment.npy
+2024-12-27 22:20:34,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:20:34,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:20:34,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:20:34,Save Environment,environment.npy
+2024-12-27 22:20:34,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:20:40,Save Environment,environment.npy
+2024-12-27 22:24:59,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:24:59,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:24:59,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:24:59,Save Environment,environment.npy
+2024-12-27 22:24:59,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:25:06,Save Environment,environment.npy
+2024-12-27 22:25:08,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-27 22:25:08,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-27 22:25:08,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:25:08,Save Environment,environment.npy
+2024-12-27 22:25:08,Grid Stats Printed,Printed grid statistics to console.
+2024-12-27 22:25:12,Save Environment,environment.npy
+2024-12-28 00:36:35,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 00:36:35,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-28 00:36:35,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 00:36:35,Save Environment,environment.npy
+2024-12-28 00:36:35,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 00:36:50,Save Environment,environment.npy
