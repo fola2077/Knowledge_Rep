@@ -100,7 +100,7 @@ def main():
     clock = pygame.time.Clock()
 
     # Initialize simulation components
-    environment = Environment()
+    environment = Environment(load_from_file=True)
     time_manager = TimeManager()
     weather_system = WeatherSystem(time_manager)
 
