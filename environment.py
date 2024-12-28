@@ -124,25 +124,37 @@ class Environment:
         self.log_action('Save Environment', filename)
 
     def load_environment(self, filename='environment.npy'):
-        try:
+        # try:
             environment_data = np.load(filename, allow_pickle=True).item()
+
+            # Assign loaded data to instance attributes
+            self.grid = environment_data.get('grid', self.generate_grid())
+            self.land_mask = self.grid > WATER_LEVEL  # Define land_mask
+            self.buildings = environment_data.get('buildings', self.add_buildings())
+
+
             print(f"Environment loaded from '{filename}'.")
             self.log_action("Environment Loaded", f"Loaded from '{filename}'")
             self.print_grid_stats()
             return environment_data  # Return full data for main.py to handle drones
-        except FileNotFoundError:
-            print(f"File '{filename}' not found. Generating a new environment.")
-            self.log_action("Load Failed", f"File '{filename}' not found. Generated new environment.")
-            return None
-        except Exception as e:
-            print(f"Failed to load environment from '{filename}': {e}")
-            self.log_action("Load Failed", f"Failed to load from '{filename}': {e}")
-            # If loading fails, generate a new grid
-            self.grid = self.generate_grid()
-            self.land_mask = self.grid > WATER_LEVEL  # Define land_mask before adding buildings
-            self.buildings = self.add_buildings()
-            self.print_grid_stats()
-            return None  # Indicate failure
+        # except FileNotFoundError:
+        #     print(f"File '{filename}' not found. Generating a new environment.")
+        #     self.log_action("Load Failed", f"File '{filename}' not found. Generated new environment.")
+        #     # Assign defaults when file not found
+        #     self.grid = self.generate_grid()
+        #     self.land_mask = self.grid > WATER_LEVEL
+        #     self.buildings = self.add_buildings()
+        #     self.print_grid_stats()
+        #     return None
+        # except Exception as e:
+        #     print(f"Failed to load environment from '{filename}': {e}")
+        #     self.log_action("Load Failed", f"Failed to load from '{filename}': {e}")
+        #     # If loading fails, generate a new grid
+        #     self.grid = self.generate_grid()
+        #     self.land_mask = self.grid > WATER_LEVEL  # Define land_mask before adding buildings
+        #     self.buildings = self.add_buildings()
+        #     self.print_grid_stats()
+        #     return None  # Indicate failure
 
     def print_grid_stats(self):
         print("=== Grid Statistics ===")

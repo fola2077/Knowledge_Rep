@@ -205,3 +205,78 @@ Timestamp,Action,Details
 2024-12-28 00:36:35,Save Environment,environment.npy
 2024-12-28 00:36:35,Grid Stats Printed,Printed grid statistics to console.
 2024-12-28 00:36:50,Save Environment,environment.npy
+2024-12-28 00:38:26,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 00:38:26,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-28 00:38:26,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 00:38:26,Save Environment,environment.npy
+2024-12-28 00:38:26,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 00:38:35,Save Environment,environment.npy
+2024-12-28 00:47:10,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 00:47:10,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-28 00:47:10,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 00:47:10,Save Environment,environment.npy
+2024-12-28 00:47:10,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 00:47:31,Save Environment,environment.npy
+2024-12-28 01:51:39,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 01:51:39,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-28 01:51:39,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 01:51:39,Save Environment,environment.npy
+2024-12-28 01:51:39,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 01:51:44,Save Environment,environment.npy
+2024-12-28 01:51:46,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 01:51:46,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'grid'
+2024-12-28 01:51:46,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 01:51:46,Save Environment,environment.npy
+2024-12-28 01:51:46,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 01:51:49,Save Environment,environment.npy
+2024-12-28 02:05:31,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'land_mask'
+2024-12-28 02:05:31,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:05:31,Save Environment,environment.npy
+2024-12-28 02:05:31,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:05:35,Save Environment,environment.npy
+2024-12-28 02:05:40,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'land_mask'
+2024-12-28 02:05:40,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:05:40,Save Environment,environment.npy
+2024-12-28 02:05:40,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:05:43,Save Environment,environment.npy
+2024-12-28 02:06:03,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'land_mask'
+2024-12-28 02:06:03,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:06:03,Save Environment,environment.npy
+2024-12-28 02:06:03,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:06:12,Save Environment,environment.npy
+2024-12-28 02:07:01,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'land_mask'
+2024-12-28 02:07:01,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:07:01,Save Environment,environment.npy
+2024-12-28 02:07:01,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:07:05,Save Environment,environment.npy
+2024-12-28 02:14:51,Load Failed,File 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy' not found. Generated new environment.
+2024-12-28 02:14:51,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:14:51,Save Environment,environment.npy
+2024-12-28 02:14:51,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:14:54,Save Environment,environment.npy
+2024-12-28 02:15:11,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'land_mask'
+2024-12-28 02:15:11,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:15:11,Save Environment,environment.npy
+2024-12-28 02:15:11,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:15:19,Save Environment,environment.npy
+2024-12-28 02:15:26,Load Failed,Failed to load from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy': 'Environment' object has no attribute 'land_mask'
+2024-12-28 02:15:26,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:15:26,Save Environment,environment.npy
+2024-12-28 02:15:26,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:15:34,Save Environment,environment.npy
+2024-12-28 02:19:22,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 02:19:22,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:19:22,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:19:25,Save Environment,environment.npy
+2024-12-28 02:19:30,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 02:19:30,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:19:30,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:19:41,Save Environment,environment.npy
+2024-12-28 02:19:48,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 02:19:48,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:19:48,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:19:53,Save Environment,environment.npy
+2024-12-28 02:20:00,Environment Loaded,Loaded from 'c:\Users\KAMI\Downloads\KRR PROJ\Knowledge_Rep\environment.npy'
+2024-12-28 02:20:00,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:20:00,Grid Stats Printed,Printed grid statistics to console.
+2024-12-28 02:20:14,Save Environment,environment.npy
