@@ -8,7 +8,7 @@ import logging
 from drone import Drone
 from environment import Environment, WATER_LEVEL
 from weather import WeatherSystem, TimeManager
-from oilspillage import OilSpillage
+from oilspillage import OilSpillage  # new manager-based class (no start_position arg)
 from config import WIDTH, HEIGHT
 
 # Constants
@@ -16,22 +16,22 @@ CELL_SIZE = 10
 FPS = 60
 
 # Colors
-DRONE_COLOR = (255, 165, 0)     # Red color for drones
-INFO_COLOR = (255, 255, 255)  # White color for info text
+DRONE_COLOR = (255, 165, 0)     # Orange for drones
+INFO_COLOR = (255, 255, 255)    # White text
 
 blue_shades = [
-    (0, 0, 139),      # Dark Blue
-    (0, 0, 205),      # Medium Blue
-    (0, 0, 255)       # Blue
+    (0, 0, 139),   # Dark Blue
+    (0, 0, 205),   # Medium Blue
+    (0, 0, 255)    # Blue
 ]
 
-DRONE_SPEED_FACTOR = 0.95 # Speed factor for drones
+DRONE_SPEED_FACTOR = 0.95
 
 # Initialize Pygame fonts
 pygame.font.init()
 FONT = pygame.font.Font(None, 24)
 
-# Configure logging for main.py
+# Configure logging
 logging.basicConfig(
     filename='main.log',
     filemode='w',  # Overwrite log file each run
@@ -52,29 +52,29 @@ def render_static_environment(environment_surface, environment):
     """
     environment_surface.fill((0, 0, 0))  # Black background
 
-    for x in range(environment.grid_width):
-        for y in range(environment.grid_height):
+    for gx in range(environment.grid_width):
+        for gy in range(environment.grid_height):
             rect = pygame.Rect(
-                x * CELL_SIZE,
-                y * CELL_SIZE,
+                gx * CELL_SIZE,
+                gy * CELL_SIZE,
                 CELL_SIZE,
                 CELL_SIZE
             )
-            elevation = environment.grid[x, y]
+            elevation = environment.grid[gx, gy]
 
             if elevation > WATER_LEVEL:
-                pygame.draw.rect(environment_surface, (34, 139, 34), rect)  # LAND_COLOR
-
-                if environment.buildings[x, y] > 0:
+                # Land
+                pygame.draw.rect(environment_surface, (34, 139, 34), rect)
+                if environment.buildings[gx, gy] > 0:
                     building_rect = pygame.Rect(
-                        x * CELL_SIZE + CELL_SIZE // 4,
-                        y * CELL_SIZE + CELL_SIZE // 4,
+                        gx * CELL_SIZE + CELL_SIZE // 4,
+                        gy * CELL_SIZE + CELL_SIZE // 4,
                         CELL_SIZE // 2,
                         CELL_SIZE // 2
                     )
                     pygame.draw.rect(environment_surface, (139, 69, 19), building_rect)  # BUILDING_COLOR
             else:
-                # Draw water based on elevation
+                # Water
                 shade_index = min(
                     int(elevation / WATER_LEVEL * (len(blue_shades) - 1)),
                     len(blue_shades) - 1
@@ -84,38 +84,42 @@ def render_static_environment(environment_surface, environment):
 
     # Draw grid lines
     for x in range(0, WIDTH, CELL_SIZE):
-        pygame.draw.line(environment_surface, (200, 200, 200), (x, 0), (x, HEIGHT))  # GRID_LINES_COLOR
+        pygame.draw.line(environment_surface, (200, 200, 200), (x, 0), (x, HEIGHT))
     for y in range(0, HEIGHT, CELL_SIZE):
-        pygame.draw.line(environment_surface, (200, 200, 200), (0, y), (WIDTH, y))  # GRID_LINES_COLOR
+        pygame.draw.line(environment_surface, (200, 200, 200), (0, y), (WIDTH, y))
 
-    # Highlight buildings with white borders
-    for x in range(environment.grid_width):
-        for y in range(environment.grid_height):
-            if environment.buildings[x, y] > 0:
-                rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                pygame.draw.rect(environment_surface, (255, 255, 255), rect, 1)  # HIGHLIGHT_COLOR
+    # Highlight buildings
+    for gx in range(environment.grid_width):
+        for gy in range(environment.grid_height):
+            if environment.buildings[gx, gy] > 0:
+                rect = pygame.Rect(gx * CELL_SIZE, gy * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                pygame.draw.rect(environment_surface, (255, 255, 255), rect, 1)
 
-# Function Definitions
+def render_oil_spills(environment_surface, environment, oil_spillage_manager):
+    """
+    Render all active oil spills from the OilSpillage manager.
+    """
+    # Combine all spills into one grid
+    oil_grid = oil_spillage_manager.combined_oil_grid()
+    max_conc = np.max(oil_grid)
+    print(f"Rendering oil spills: max conc = {max_conc:.2f}")
 
-def render_oil_spill(environment_surface, environment):
-    if environment.oil_spill:
-        oil_concentration_grid = environment.oil_spill.grid
-        max_concentration = np.max(oil_concentration_grid)
-        print(f"Rendering oil spill: Max concentration {max_concentration}")
-        if max_concentration > 0:
-            # Use a fixed color for visibility testing
-            oil_color = (255, 0, 0)  # Bright red
-            
-            for x in range(environment.grid_width):
-                for y in range(environment.grid_height):
-                    if environment.oil_spill.grid[x, y] > 0:
-                        rect = pygame.Rect(
-                            x * CELL_SIZE,
-                            y * CELL_SIZE,
-                            CELL_SIZE,
-                            CELL_SIZE
-                        )
-                        pygame.draw.rect(environment_surface, oil_color, rect)
+    if max_conc > 0:
+        for gx in range(environment.grid_width):
+            for gy in range(environment.grid_height):
+                conc = oil_grid[gx, gy]
+                if conc > 0:
+                    # Scale color intensity by concentration
+                    # Let's assume max 10 oil per cell from the manager
+                    intensity = min(int(conc / 10 * 255), 255)
+                    oil_color = (255, intensity, intensity)  # Red-based gradient
+                    rect = pygame.Rect(
+                        gx * CELL_SIZE,
+                        gy * CELL_SIZE,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    )
+                    pygame.draw.rect(environment_surface, oil_color, rect)
 
 def main():
     # Initialize Pygame
@@ -124,114 +128,106 @@ def main():
     pygame.display.set_caption("Drone Simulation with Environment and Weather")
     clock = pygame.time.Clock()
 
-    # Initialize simulation components
+    # Initialize environment, time, weather
     environment = Environment(load_from_file=True)
     time_manager = TimeManager()
     weather_system = WeatherSystem(time_manager)
 
     logging.info("Simulation started.")
 
-    # Initialize drones based on the loaded environment
+    # Create drones
     num_drones = 5
     drones = []
     land_indices = list(zip(*np.where(environment.land_mask)))
-    random.shuffle(land_indices)  # Shuffle to randomize drone placement
+    random.shuffle(land_indices)
 
     for i in range(1, num_drones + 1):
         if not land_indices:
             logging.warning("No land available to place more drones.")
             break
-        pos_idx = land_indices.pop()
-        grid_x, grid_y = pos_idx
-        x = grid_x * CELL_SIZE + CELL_SIZE // 2
-        y = grid_y * CELL_SIZE + CELL_SIZE // 2
+        gx, gy = land_indices.pop()
+        x = gx * CELL_SIZE + CELL_SIZE // 2
+        y = gy * CELL_SIZE + CELL_SIZE // 2
 
-        # Ensure no building at this position
-        if environment.buildings[grid_x, grid_y] > 0:
-            logging.warning(f"Drone {i} placement on building at ({x}, {y}) avoided.")
+        # Avoid buildings
+        if environment.buildings[gx, gy] > 0:
+            logging.warning(f"Drone {i} avoided building at ({x}, {y}).")
             continue
 
         drone = Drone(id=i, position=(x, y), weather_system=weather_system, color=DRONE_COLOR)
         drone.load_environment(environment)
         drones.append(drone)
-        logging.info(f"Drone {i} initialized at position ({x}, {y}).")
+        logging.info(f"Drone {i} at position ({x}, {y}).")
 
-    environment.drones = drones  # If Environment class utilizes this
+    environment.drones = drones
 
-    # Create environment surface
+    # Create the oil spillage manager
+    # volume_range can be changed if you want random smaller/larger spills
+    oil_spillage_manager = OilSpillage(
+        environment=environment,
+        volume_range=(50, 200),  # random volumes between 50 and 200
+        oil_type='Light Crude'
+    )
+
+    # In the new approach, oil_spillage_manager will automatically spawn
+    # new spills each day, handle spreading, etc.
+
+    # Setup environment surface
     environment_surface = pygame.Surface((WIDTH, HEIGHT))
     render_static_environment(environment_surface, environment)
 
-    # Initialize oil spill
-    oil_spill = OilSpillage(
-        environment=environment,
-        start_position=(WIDTH // 2, HEIGHT // 2),  # Starting at the center
-        volume=5000,  # Arbitrary units
-        oil_type='Light Crude'
-    )
-    environment.add_oil_spill(oil_spill)
-
-
-
     running = True
     while running:
-        dt = clock.tick(FPS) / 1000.0  # Delta time in seconds
+        dt = clock.tick(FPS) / 1000.0  # seconds
 
         # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-        # Update simulation time and weather
+        # Update time and weather
         time_manager.update(dt)
         weather_system.update(dt)
 
-        # Update oil spill
-        oil_spill.update(dt, weather_system)
+        # Update oil spills
+        # pass the day_count from time_manager
+        oil_spillage_manager.update(dt, weather_system, day_count=time_manager.day_count)
 
-        # Update drones: find neighbors, share information, and adjust behavior based on weather
+        # Update drones
         for drone in drones:
             drone.find_neighbors(drones)
-
         for drone in drones:
             drone.share_information()
-
         for drone in drones:
             drone.update_behavior()
-
-            # Define base movement per second
+            # Example random movement
             movement_per_second = CELL_SIZE * DRONE_SPEED_FACTOR
-
-            # Example movement: random movement within cell size
-            dx = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt) # movement is proportional to time elapsed
-            dy = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt) # movement is proportional to time elapsed
+            dx = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt)
+            dy = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt)
             drone.move(dx, dy, drones)
-            # Drones detect oil spill
-            drone.detect_oil()
+            drone.detect_oil()  # detect oil if relevant
 
-        # Rendering
-        # Clear environment_surface by re-rendering static environment
+        # Render environment
         render_static_environment(environment_surface, environment)
 
-        # Render oil spill
-        render_oil_spill(environment_surface, environment)
+        # Render oil spills
+        render_oil_spills(environment_surface, environment, oil_spillage_manager)
 
-        # Draw drones on environment_surface
+        # Render drones
         for drone in drones:
             pygame.draw.circle(
-                environment_surface, 
-                drone.color, 
-                (int(drone.position.x), int(drone.position.y)), 
+                environment_surface,
+                drone.color,
+                (int(drone.position.x), int(drone.position.y)),
                 5
             )
-            # Optionally, draw drone ID
+            # drone ID
             id_text = FONT.render(str(drone.id), True, INFO_COLOR)
             environment_surface.blit(id_text, (drone.position.x + 5, drone.position.y - 10))
 
-        # Blit environment_surface onto the main screen
+        # Blit and show stats
         screen.blit(environment_surface, (0, 0))
 
-        # Render statistics
         stats = [
             f"Day: {time_manager.day_count + 1}",
             f"Time: {time_manager.hour:02}:{int(time_manager.minute):02}",
@@ -241,7 +237,7 @@ def main():
             f"Temperature: {weather_system.get_current_weather().temperature:.1f} °C",
             f"Humidity: {weather_system.get_current_weather().humidity:.1f}%",
             f"Wind Speed: {weather_system.get_current_weather().wind_speed:.1f} m/s",
-            f"Wind Direction: {weather_system.get_current_weather().wind_direction:.1f}°",
+            f"Wind Dir: {weather_system.get_current_weather().wind_direction:.1f}°",
             f"Precipitation: {weather_system.get_current_weather().precipitation_type}",
             f"Visibility: {weather_system.get_current_weather().visibility:.2f}",
             f"Cloud Density: {weather_system.get_current_weather().cloud_density:.2f}",
@@ -251,18 +247,17 @@ def main():
 
         y_offset = 10
         for stat in stats:
-            stat_surface = FONT.render(stat, True, INFO_COLOR)
-            screen.blit(stat_surface, (10, y_offset))
+            stat_surf = FONT.render(stat, True, INFO_COLOR)
+            screen.blit(stat_surf, (10, y_offset))
             y_offset += 20
 
-        # Update the display
         pygame.display.flip()
 
-    # Save environment and drones upon exit
+    # On exit, save environment + drones
     environment.save_environment(drones)
     logging.info("Environment and drones saved on exit.")
 
-    # Close the weather CSV file if necessary
+    # Close weather CSV if needed
     if hasattr(weather_system, 'close_csv'):
         weather_system.close_csv()
 

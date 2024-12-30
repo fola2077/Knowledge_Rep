@@ -5,170 +5,209 @@ import random
 import math
 import logging
 
+from environment import Environment, WATER_LEVEL
 from config import WIDTH, HEIGHT, CELL_SIZE
 
 class OilSpillage:
-    def __init__(self, environment, start_position, volume, oil_type='Light Crude'):
+    def __init__(self, environment, volume_range=(50, 200), oil_type='Light Crude'):
         """
-        Initialize the oil spillage event.
+        Initialize an OilSpillage manager that can create multiple spills per day.
 
         Parameters:
-            environment: The Environment instance.
-            start_position: Tuple (x, y) in pixels where the spill originates.
-            volume: The initial volume of the oil spill (arbitrary units).
-            oil_type: Type of oil spilled, affecting spread and weathering.
+            environment: The Environment instance (with .grid, .grid_width, .grid_height).
+            volume_range: A (min, max) tuple for random spill volume generation.
+            oil_type: Type of oil. Affects spread/evap rates.
         """
         self.environment = environment
-        self.start_position = start_position  # Position in pixels
-        self.volume = volume
         self.oil_type = oil_type
-        self.time_elapsed = 0  # Time since spill started
-        self.grid = np.zeros_like(environment.grid)  # Oil concentration grid matching environment
+        self.min_volume, self.max_volume = volume_range
+        self.logger = logging.getLogger('OilSpillage')
+
+        # In this approach, we don't store just one 'self.grid';
+        # we might have multiple discrete spills. Let's store them in a list of grids
+        self.active_spills = []  # Each element is a separate np array, same shape as environment.grid
+
+        # Constants for oil behavior
+        self.spread_fraction = 0.10  # e.g., 10% spreads out each "hourly" step
+        self.max_oil_per_cell = 10
+        self.spill_logs = []
+
+        # Precompute rates from oil type
         self.spread_rate = self.calculate_spread_rate(oil_type)
         self.evaporation_rate = self.calculate_evaporation_rate(oil_type)
-        self.logger = logging.getLogger('OilSpillage')
-        self.initialize_spill()
 
-    def initialize_spill(self):
-        """
-        Place the initial oil concentration on the grid.
-        """
-        grid_x = int(self.start_position[0] // CELL_SIZE)
-        grid_y = int(self.start_position[1] // CELL_SIZE)
-        if 0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height:
-            self.grid[grid_x, grid_y] = self.volume
-            self.logger.info(f"Oil spill initialized at grid cell ({grid_x}, {grid_y}) with volume {self.volume}.")
-            print(f"Oil spill volume set at grid cell ({grid_x}, {grid_y})")
-        else:
-            self.logger.error("Oil spill start position is out of bounds.")
-            print("Error: Oil spill start position is out of bounds.")
+        # We track time to know when an hour/day passes
+        self.accumulated_time = 0.0
+        self.day_index = 0  # To track when we roll over to a new day and create new spills
 
     def calculate_spread_rate(self, oil_type):
-        """
-        Calculate the spread rate based on the oil type.
-        """
-        # Simplified spread rate; you can adjust based on oil type
+        # You can still keep or remove if you want more advanced logic
         if oil_type == 'Light Crude':
-            return 0.1
-        elif oil_type == 'Heavy Crude':
             return 0.05
+        elif oil_type == 'Heavy Crude':
+            return 0.02
         else:
-            return 0.08  # Default spread rate
+            return 0.04
 
     def calculate_evaporation_rate(self, oil_type):
-        """
-        Calculate the evaporation rate based on the oil type.
-        """
         if oil_type == 'Light Crude':
             return 0.02
         elif oil_type == 'Heavy Crude':
             return 0.005
         else:
-            return 0.01  # Default evaporation rate      
+            return 0.01
 
-    def update(self, dt, weather_system):
+    def create_daily_spills(self, num_spills=4):
         """
-        Update the oil spill over time.
-
-        Parameters:
-            dt: Time delta since the last update (seconds).
-            weather_system: The WeatherSystem instance.
+        Create 'num_spills' new random oil spills on water cells.
         """
-        self.time_elapsed += dt
-        self.spread_oil(dt, weather_system)
-        self.weather_oil(dt, weather_system)
-        max_conc = np.max(self.grid)
-        print(f"Oil spill update - Time: {self.time_elapsed:.2f}s, Max concentration: {max_conc}")
+        for _ in range(num_spills):
+            spill_volume = random.uniform(self.min_volume, self.max_volume)
+            # find a random water cell
+            while True:
+                x = random.randint(0, self.environment.grid_width - 1)
+                y = random.randint(0, self.environment.grid_height - 1)
+                if self.environment.grid[x, y] <= WATER_LEVEL:
+                    break
+            # Make a new grid for this spill
+            new_spill_grid = np.zeros_like(self.environment.grid)
+            new_spill_grid[x, y] = spill_volume
 
-    def spread_oil(self, dt, weather_system):
+            msg = (f"New oil spill created on Day {self.day_index} at cell ({x},{y}) "
+                   f"with volume={spill_volume:.2f}")
+            self.logger.info(msg)
+            print(msg)
+
+            self.active_spills.append(new_spill_grid)
+
+    def update(self, dt, weather_system, day_count):
         """
-        Simulate the spreading of oil on the grid.
-
-        Parameters:
-            dt: Time delta since the last update (seconds).
-            weather_system: The WeatherSystem instance.
+        Called every frame/timestep with dt (in seconds) and the current day_count from the TimeManager.
+        If day_count changes, we create new spills (ensuring at least 4 per day).
         """
-        # Diffusion component
-        diffusion_coefficient = self.spread_rate
-        self.grid = self.diffuse(self.grid, diffusion_coefficient, dt)
+        # Check if we rolled over to a new day
+        if day_count != self.day_index:
+            self.day_index = day_count
+            # Create new spills for the new day
+            self.create_daily_spills(num_spills=4)
 
-        # Advection component (wind effect)
-        wind_speed = weather_system.current_state.wind_speed
-        wind_direction = weather_system.current_state.wind_direction
-        self.grid = self.advect(self.grid, wind_speed, wind_direction, dt)
+        self.accumulated_time += dt
 
-    def diffuse(self, grid, diffusion_coefficient, dt):
+        # We'll do the "big spread step" only once per hour
+        # i.e. if accumulated_time crosses a multiple of 3600
+        while self.accumulated_time >= 3600.0:
+            self.accumulated_time -= 3600.0
+            # Spread + advect each spill
+            for i in range(len(self.active_spills)):
+                self.active_spills[i] = self.spread_oil(self.active_spills[i], weather_system)
+                self.active_spills[i] = self.advect(self.active_spills[i], weather_system)
+                # clamp after advection
+                self.active_spills[i] = np.minimum(np.maximum(self.active_spills[i], 0),
+                                                   self.max_oil_per_cell)
+
+        # Evaporation occurs every frame (small increments each dt)
+        for i in range(len(self.active_spills)):
+            self.active_spills[i] = self.weather_oil(self.active_spills[i], dt, weather_system)
+
+    def spread_oil(self, spill_grid, weather_system):
         """
-        Apply diffusion to the oil concentration grid.
-
-        Parameters:
-            grid: Current oil concentration grid.
-            diffusion_coefficient: Rate at which oil diffuses over the grid.
-            dt: Time delta (seconds).
+        Spread some fraction of oil to neighbors in the same grid, one cell at a time.
         """
-        # Simple diffusion using convolution with a kernel
-        kernel_size = 3
-        scaling_factor = 10  # Adjust based on grid size
-        kernel = np.ones((kernel_size, kernel_size)) / (kernel_size ** 2)
-        diffused_grid = grid + diffusion_coefficient * dt * scaling_factor * self.convolve(grid, kernel)
-        return diffused_grid
+        new_grid = np.copy(spill_grid)
+        for x in range(self.environment.grid_width):
+            for y in range(self.environment.grid_height):
+                amt = spill_grid[x, y]
+                if amt > 0:
+                    neighbors = self.get_neighbors(x, y)
+                    portion = amt * self.spread_fraction
+                    if neighbors and portion > 0:
+                        share = portion / len(neighbors)
+                        for (nx, ny) in neighbors:
+                            # Only spread onto water
+                            if self.environment.grid[nx, ny] <= WATER_LEVEL:
+                                new_grid[nx, ny] += share
+                            else:
+                                # If we find land, log it and skip
+                                if (nx, ny) not in self.spill_logs:
+                                    self.spill_logs.append((nx, ny))
+                                    logmsg = (f"Oil tried to spread onto land at ({nx},{ny}). "
+                                              f"Stopping spread there.")
+                                    self.logger.info(logmsg)
+                                    print(logmsg)
+                        new_grid[x, y] -= portion
+        return new_grid
 
-    def convolve(self, grid, kernel):
+    def advect(self, spill_grid, weather_system):
         """
-        Apply convolution to the grid with given kernel.
-
-        Parameters:
-            grid: Grid to convolve.
-            kernel: Convolution kernel.
+        Move the entire oil distribution ONE cell in the nearest cardinal direction of wind.
         """
-        from scipy.ndimage import convolve
-        return convolve(grid, kernel, mode='constant', cval=0.0)
+        wind_dir = weather_system.current_state.wind_direction
+        (dx, dy) = self.cardinal_direction(wind_dir)
 
-    def advect(self, grid, wind_speed, wind_direction, dt):
+        # Move entire spill by 1 cell in that direction
+        new_grid = np.zeros_like(spill_grid)
+        for x in range(self.environment.grid_width):
+            for y in range(self.environment.grid_height):
+                amt = spill_grid[x, y]
+                if amt > 0:
+                    nx = x + dx
+                    ny = y + dy
+                    if 0 <= nx < self.environment.grid_width and 0 <= ny < self.environment.grid_height:
+                        new_grid[nx, ny] += amt
+                    else:
+                        # oil leaves the map
+                        pass
+        return new_grid
+
+    def cardinal_direction(self, wind_degs):
         """
-        Apply advection to the oil concentration grid based on wind.
-
-        Parameters:
-            grid: Current oil concentration grid.
-            wind_speed: Speed of the wind (m/s).
-            wind_direction: Direction of the wind (degrees).
-            dt: Time delta (seconds).
+        Convert wind_degs (0-359) to a nearest cardinal direction:
+          0   -> East (1,0)
+          90  -> North (0,-1)
+          180 -> West (-1,0)
+          270 -> South (0,1)
+        We also handle angles in between by rounding to nearest cardinal.
         """
-        # Calculate shift in x and y based on wind speed and direction
-        angle_rad = math.radians(wind_direction)
-        advection_scaling = 0.5 # Adjust based on grid size
-        dx = np.cos(angle_rad) * wind_speed * dt * advection_scaling 
-        dy = np.sin(angle_rad) * wind_speed * dt * advection_scaling
+        wind_degs %= 360
+        # We'll do a simple approach: each quadrant is 90 degrees
+        if wind_degs < 45 or wind_degs >= 315:
+            return (1, 0)   # East
+        elif wind_degs < 135:
+            return (0, -1)  # North (in many grids, y-1 is up)
+        elif wind_degs < 225:
+            return (-1, 0)  # West
+        else:
+            return (0, 1)   # South
 
-        dx_int = int(round(dx))
-        dy_int = int(round(dy))
+    def get_neighbors(self, x, y):
+        neighbors = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.environment.grid_width and 0 <= ny < self.environment.grid_height:
+                    neighbors.append((nx, ny))
+        return neighbors
 
-        shifted_grid = np.roll(grid, shift=dx_int, axis=0)
-        shifted_grid = np.roll(shifted_grid, shift=dy_int, axis=1)
-
-        # Apply boundary conditions
-        if dx > 0:
-            shifted_grid[:int(dx), :] = 0
-        elif dx < 0:
-            shifted_grid[int(dx):, :] = 0
-        if dy > 0:
-            shifted_grid[:, :int(dy)] = 0
-        elif dy < 0:
-            shifted_grid[:, int(dy):] = 0
-
-        return shifted_grid
-    
-    def weather_oil(self, dt, weather_system):
+    def weather_oil(self, spill_grid, dt, weather_system):
         """
-        Simulate weathering processes like evaporation.
-
-        Parameters:
-            dt: Time delta (seconds).
-            weather_system: The WeatherSystem instance.
+        Evaporation each frame. The total volume goes down gradually.
         """
-        # Evaporation reduces oil volume
-        temperature = weather_system.current_state.temperature  # °C
-        evaporation_factor = self.evaporation_rate * (1 + (temperature - 15) / 100)  # Adjust based on temperature
-        self.grid -= self.grid * evaporation_factor * dt
-        self.grid = np.maximum(self.grid, 0)  # Ensure no negative concentrations
+        temperature = weather_system.current_state.temperature
+        evaporation_factor = self.evaporation_rate * (1 + (temperature - 15) / 100)
+        # apply small evaporation each dt
+        new_grid = spill_grid - spill_grid * evaporation_factor * dt
+        new_grid = np.maximum(new_grid, 0)
+        return new_grid
 
+    def combined_oil_grid(self):
+        """
+        If you want to render all spills as one, sum them up.
+        """
+        if not self.active_spills:
+            return np.zeros_like(self.environment.grid)
+        total_grid = np.zeros_like(self.environment.grid)
+        for g in self.active_spills:
+            total_grid += g
+        return total_grid
