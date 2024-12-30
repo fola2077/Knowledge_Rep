@@ -273,3 +273,186 @@ if __name__ == "__main__":
     finally:
         pygame.quit()
         sys.exit()
+
+
+###############################################################################################################
+import pygame
+import sys
+import random
+import numpy as np
+import logging
+
+# Original imports remain
+from drone import Drone
+from environment import Environment, WATER_LEVEL
+from weather import WeatherSystem, TimeManager
+from oilspillage import OilSpillage
+from config import WIDTH, HEIGHT
+
+# Constants
+CELL_SIZE = 10
+FPS = 60
+
+# Colors
+DRONE_COLOR = (255, 165, 0)     # Red color for drones
+INFO_COLOR = (255, 255, 255)  # White color for info text
+blue_shades = [
+    (0, 0, 139),      # Dark Blue
+    (0, 0, 205),      # Medium Blue
+    (0, 0, 255)       # Blue
+]
+
+# Additional constants
+DRONE_SPEED_FACTOR = 0.95  # Speed factor for drones
+
+# Initialize Pygame fonts
+pygame.font.init()
+FONT = pygame.font.Font(None, 24)
+
+# State Class
+class State:
+    def __init__(self, drone, environment):
+        """
+        Represents the state of the drone in its environment.
+        """
+        self.position = drone.position
+        self.battery = drone.battery
+        self.weather = environment.weather_system.get_current_weather()
+        self.oil_detected = False
+
+    def update(self, new_position, new_battery, oil_detected):
+        """
+        Updates the state based on actions and transitions.
+        """
+        self.position = new_position
+        self.battery = new_battery
+        self.oil_detected = oil_detected
+
+# Decision Class
+class Decision:
+    def __init__(self, dx=0, dy=0, dz=0):
+        """
+        Represents a drone's decision (movement in x, y, z directions).
+        """
+        self.dx = dx
+        self.dy = dy
+        self.dz = dz  # Optional depth adjustment
+
+    def __repr__(self):
+        return f"Decision(dx={self.dx}, dy={self.dy}, dz={self.dz})"
+
+# Exogenous Information Class
+class ExogenousInfo:
+    def __init__(self, weather):
+        """
+        Represents exogenous information affecting the drone.
+        """
+        self.weather = weather
+
+    def get_effect_on_battery(self):
+        """
+        Simulates how weather affects battery usage (e.g., wind increases cost).
+        """
+        if self.weather.wind_speed > 5.0:
+            return 1.2  # 20% more battery usage in windy conditions
+        return 1.0  # Normal battery usage
+
+# Transition Function
+def transition_function(state, action, environment):
+    """
+    Determines how the state evolves based on the action and environment.
+    """
+    x, y = state.position
+    dx, dy = action
+
+    # Calculate new position
+    new_position = (x + dx, y + dy)
+    # Update battery based on movement and weather
+    weather = environment.weather_system.get_current_weather()
+    new_battery = state.battery - calculate_battery_cost(dx, dy, weather)
+
+    # Check if oil is detected
+    oil_detected = environment.oil_spill.grid[int(new_position[0] / CELL_SIZE)][int(new_position[1] / CELL_SIZE)] > 0
+
+    # Return updated state
+    return State(None, environment).update(new_position, new_battery, oil_detected)
+
+# Objective Function
+def objective_function(drones, environment):
+    """
+    Evaluates the performance of the drones based on oil detection and resource efficiency.
+    """
+    total_oil_detected = sum(1 for drone in drones if drone.detect_oil())
+    total_battery_used = sum(100 - drone.battery for drone in drones)  # Max battery = 100
+    return total_oil_detected - 0.1 * total_battery_used  # Reward for oil detection, penalty for battery usage
+
+# Decision Logic
+def decide_action(state, environment):
+    """
+    Determines the drone's next action based on its state and environment.
+    """
+    dx = random.randint(-CELL_SIZE, CELL_SIZE)
+    dy = random.randint(-CELL_SIZE, CELL_SIZE)
+    dz = 0  # Depth not used here
+    x, y = state.position
+    new_x = max(0, min(WIDTH - CELL_SIZE, x + dx))
+    new_y = max(0, min(HEIGHT - CELL_SIZE, y + dy))
+    if state.oil_detected:
+        dx, dy = 0, 0
+    return Decision(dx=new_x - x, dy=new_y - y, dz=dz)
+
+# Main Simulation Logic
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Drone Simulation with Decisions and Exogenous Info")
+    clock = pygame.time.Clock()
+
+    # Initialize simulation components
+    environment = Environment(load_from_file=True)
+    time_manager = TimeManager()
+    weather_system = WeatherSystem(time_manager)
+
+    # Initialize drones
+    num_drones = 5
+    drones = []
+    land_indices = list(zip(*np.where(environment.land_mask)))
+    random.shuffle(land_indices)
+
+    for i in range(1, num_drones + 1):
+        if not land_indices:
+            break
+        pos_idx = land_indices.pop()
+        x = pos_idx[0] * CELL_SIZE + CELL_SIZE // 2
+        y = pos_idx[1] * CELL_SIZE + CELL_SIZE // 2
+        drone = Drone(id=i, position=(x, y), weather_system=weather_system, color=DRONE_COLOR)
+        drone.load_environment(environment)
+        drones.append(drone)
+
+    environment.drones = drones
+
+    running = True
+    while running:
+        dt = clock.tick(FPS) / 1000.0
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        time_manager.update(dt)
+        weather_system.update(dt)
+
+        for drone in drones:
+            state = State(drone, environment)
+            exo_info = ExogenousInfo(weather_system.get_current_weather())
+            action = decide_action(state, environment)
+            new_state = transition_function(state, (action.dx, action.dy), environment)
+            drone.position = new_state.position
+            drone.battery = new_state.battery
+            drone.oil_detected = new_state.oil_detected
+
+    performance = objective_function(drones, environment)
+    print(f"Simulation Performance: {performance}")
+
+if __name__ == "__main__":
+    main()
+y
