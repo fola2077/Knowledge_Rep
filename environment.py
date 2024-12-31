@@ -121,6 +121,7 @@ class Environment:
             oil_spill: An instance of OilSpillage.
         """
         self.oil_spill = oil_spill
+        self.logger.info("Oil spill added to the environment.")
 
     def save_environment(self, drones, filename='environment.npy'):
         """
