@@ -274,3 +274,160 @@ if __name__ == "__main__":
         pygame.quit()
         sys.exit()
 
+<<<<<<< HEAD
+=======
+
+###############################################################################################################
+import pygame
+import sys
+import random
+import numpy as np
+import logging
+
+# Constants
+CELL_SIZE = 10
+FPS = 60
+WIDTH, HEIGHT = 800, 600  # Example dimensions
+
+DRONE_COLOR = (255, 165, 0)     # Red color for drones
+INFO_COLOR = (255, 255, 255)  # White color for info text
+
+# Pygame font initialization
+pygame.font.init()
+FONT = pygame.font.Font(None, 24)
+
+# State Class
+class State:
+    def __init__(self, drone, environment):
+        """
+        Represents the state of the drone in its environment.
+        """
+        self.position = drone.position
+        self.visibility = environment.weather_system.get_current_weather().visibility
+        self.detections = drone.detections  # Total successful detections
+        self.attempts = drone.attempts      # Total detection attempts
+        self.missed_detections = drone.missed_detections  # Missed detection attempts
+
+    def update(self, new_position, new_detections, new_attempts, new_missed):
+        """
+        Updates the state based on actions and transitions.
+        """
+        self.position = new_position
+        self.detections = new_detections
+        self.attempts = new_attempts
+        self.missed_detections = new_missed
+
+# Decision Class
+class Decision:
+    def __init__(self, dx=0, dy=0):
+        """
+        Represents a drone's decision (movement in x, y directions).
+        """
+        self.dx = dx
+        self.dy = dy
+
+    def __repr__(self):
+        return f"Decision(dx={self.dx}, dy={self.dy})"
+
+# Exogenous Information Class
+class ExogenousInfo:
+    def __init__(self, weather):
+        """
+        Represents exogenous information affecting the drone.
+        """
+        self.weather = weather
+
+    def visibility_effect(self):
+        """
+        Returns the visibility modifier, which impacts detection probability.
+        """
+        return max(0.1, self.weather.visibility)  # Scale visibility between 0.1 and 1.0
+
+# Transition Function
+def transition_function(state, action, environment, exo_info):
+    """
+    Determines how the state evolves based on the action and environment.
+    """
+    x, y = state.position
+    dx, dy = action.dx, action.dy
+
+    # Calculate new position
+    new_position = (x + dx, y + dy)
+
+    # Check if oil is detected (probabilistic detection influenced by visibility)
+    detection_chance = random.random() * exo_info.visibility_effect()
+    grid_x, grid_y = int(new_position[0] / CELL_SIZE), int(new_position[1] / CELL_SIZE)
+    oil_detected = (
+        detection_chance > 0.5 and
+        environment.oil_spill.grid[grid_x][grid_y] > 0
+    )
+
+    # Update detection attempts and successes
+    new_attempts = state.attempts + 1
+    new_detections = state.detections + (1 if oil_detected else 0)
+    new_missed = state.missed_detections + (0 if oil_detected else 1)
+
+    # Return updated state
+    return State(None, environment).update(new_position, new_detections, new_attempts, new_missed)
+
+# Objective Function
+def objective_function(drones, alpha=0.1):
+    """
+    Evaluates the performance of the drones based on detection probability and penalties for missed detections.
+    """
+    total_detections = sum(drone.detections for drone in drones)
+    total_attempts = sum(drone.attempts for drone in drones)
+    total_missed = sum(drone.missed_detections for drone in drones)
+
+    if total_attempts == 0:
+        return 0  # Avoid division by zero
+
+    detection_probability = total_detections / total_attempts
+    penalty = alpha * total_missed
+
+    return detection_probability - penalty  # Maximize detection probability while minimizing misses
+
+# Main Simulation Logic
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Drone Simulation with Advanced Detection Objective")
+    clock = pygame.time.Clock()
+
+    # Initialize simulation components (mock example for simplicity)
+    environment = None  # Replace with actual environment initialization
+    weather_system = None  # Replace with actual weather system initialization
+
+    # Initialize drones
+    drones = []
+    for i in range(5):  # Example with 5 drones
+        drone = Drone(id=i + 1, position=(random.randint(0, WIDTH), random.randint(0, HEIGHT)))
+        drone.detections = 0
+        drone.attempts = 0
+        drone.missed_detections = 0
+        drones.append(drone)
+
+    running = True
+    while running:
+        dt = clock.tick(FPS) / 1000.0
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        # Example updates for each drone
+        for drone in drones:
+            state = State(drone, environment)
+            exo_info = ExogenousInfo(weather_system.get_current_weather())
+            action = Decision(dx=random.randint(-10, 10), dy=random.randint(-10, 10))
+            new_state = transition_function(state, action, environment, exo_info)
+            drone.position = new_state.position
+            drone.detections = new_state.detections
+            drone.attempts = new_state.attempts
+            drone.missed_detections = new_state.missed_detections
+
+    performance = objective_function(drones)
+    print(f"Detection Probability (with penalties): {performance:.2f}")
+
+if __name__ == "__main__":
+    main()
+>>>>>>> 5ab7f1c88897c6374cf1a9b463e925c33fb150f7
