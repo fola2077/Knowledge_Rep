@@ -110,7 +110,7 @@ class OilSpillage:
             self.last_expansion_time = current_total_minutes
 
         # Every hour, update spills
-        if current_total_minutes - self.last_expansion_time >= 60:
+        if current_total_minutes - self.last_expansion_time >= 180:
             self.last_expansion_time = current_total_minutes
             wind_dir = weather_system.current_state.wind_direction
             wind_speed = weather_system.current_state.wind_speed
@@ -122,7 +122,7 @@ class OilSpillage:
         """
         Spawn new spills at random locations on water.
         """
-        num_spills = random.randint(3, 7)
+        num_spills = random.randint(1, 4)
         for _ in range(num_spills):
             block_cells = self.find_random_4cell_block()
             if not block_cells:
@@ -164,9 +164,10 @@ class OilSpillage:
         """
         Calculate wind vector components.
         """
+        scaling_factor = 0.1  # Adjust as needed
         wind_radians = math.radians(wind_degs)
-        dx = math.cos(wind_radians) * wind_speed
-        dy = math.sin(wind_radians) * wind_speed
+        dx = math.cos(wind_radians) * wind_speed * scaling_factor
+        dy = math.sin(wind_radians) * wind_speed * scaling_factor
         return dx, dy
 
     def combined_oil_concentration(self):
@@ -184,9 +185,25 @@ class OilSpillage:
     def get_cell_color(self, concentration):
         """
         Map oil concentration to a color for rendering.
+        The color starts as dark purple at high concentration and
+        becomes lighter as the concentration decreases.
         """
-        max_intensity = 200  # Max color intensity for oil
-        intensity = int(concentration * max_intensity)
-        # Purple shades
-        color = (intensity, 0, intensity)
-        return color
+        # Define the color for maximum concentration (dark purple)
+        max_concentration_color = np.array([39, 4, 51])  # RGB values for dark purple
+
+        # Define the color for minimum concentration (lightest acceptable color)
+        min_concentration_color = np.array([169, 17, 222])  # Lighter purple or near transparent
+
+        # Normalize concentration to range [0,1]
+        norm_concentration = np.clip(concentration, 0, 1)
+
+        # Invert concentration to have dark color at high concentrations
+        inverted_concentration = norm_concentration
+
+        # Interpolate between min and max colors
+        color = inverted_concentration * max_concentration_color + (1 - inverted_concentration) * min_concentration_color
+
+        # Ensure values are within valid RGB range
+        color = np.clip(color, 0, 255).astype(int)
+
+        return tuple(color)
