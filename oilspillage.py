@@ -1,4 +1,4 @@
-# oil_spillage.py
+# oilspillage.py
 
 import numpy as np
 import random
@@ -20,11 +20,19 @@ class OilSpill:
         self.concentration = np.zeros((self.grid_width, self.grid_height), dtype=float)
         for (gx, gy) in initial_cells:
             self.concentration[gx, gy] = initial_concentration
+        self.detected_concentration = np.zeros_like(self.concentration)
+        self.status = 'active' # 'active', 'stopped', 'pending_removal'
+        self.time_since_all_detected = 0.0 # In sim hours
+        self.detection_time = np.full((self.grid_width, self.grid_height), np.nan)
+        self.pending_removal_start_time = None
 
     def spread(self, wind_dx, wind_dy):
         """
         Spread the oil spill using convolution to simulate diffusion.
         """
+        if self.status != 'active':
+            return # Do not spread if spill is not active
+        
         kernel = self.get_spread_kernel(wind_dx, wind_dy)
         new_concentration = signal.convolve2d(
             self.concentration,
@@ -72,11 +80,71 @@ class OilSpill:
         evaporation_rate = np.clip(evaporation_rate, 0, 0.05)
         self.concentration *= (1 - evaporation_rate)
 
+    def mark_detected(self, gx, gy):
+        """
+        Mark a spepcific cell as detected.
+        """
+        if 0 <= gx < self.grid_width and 0 <= gy < self.grid_height:
+            self.detected_concentration[gx, gy] = self.concentration[gx, gy]
+
+    def get_total_oil(self):
+        """
+        Get the total amount of oil concentration in the spill.
+        """
+        return np.sum(self.concentration)
+    
+    def get_total_detected_oil(self):
+        """
+        Get the total amount of detected oil concentration.
+        """
+        return np.sum(self.detected_concentration)
+    
+    def update_status(self, current_total_minutes):
+        """
+        Update the status of the spill based on detection.
+        """
+        total_oil = self.get_total_oil()
+        total_detected = self.get_total_detected_oil()
+
+        if total_oil == 0:
+            self.status = 'removed'
+            return  # No oil left
+
+        detection_ratio = total_detected / total_oil if total_oil > 0 else 0.0
+
+        if self.status == 'active' and detection_ratio >= 0.5:
+            self.status = 'stopped'
+            print("Oil spill spread has been stopped as 50% has been detected.")
+        
+        if self.status == 'stopped' and detection_ratio >= 0.6:
+            self.status = 'pending_removal'
+            self.pending_removal_start_time = current_total_minutes
+            print("All oil spill has been detected. Will remove in 3 simulation hours.")
+        
+        if self.status == 'pending_removal':
+            time_in_pending = current_total_minutes - self.pending_removal_start_time
+            if time_in_pending >= 3 * 60:
+                self.concentration = np.zeros_like(self.concentration)
+                self.detected_concentration = np.zeros_like(self.detected_concentration)
+                print("Oil spill has been removed after full detection.")
+                self.status = 'removed'  # mark as removed
+
     def is_active(self):
         """
         Check if the spill still has significant oil concentration.
         """
-        return np.any(self.concentration > 0.01)
+        return np.any(self.concentration > 0.01) and self.status != 'removed'
+    
+    def expire_detections(self, current_time_minutes, expiry_duration_minutes=6 * 60):
+        """
+        Clears detections older than 'expiry_duration' hours.
+        """
+        expired = self.detection_time < (current_time_minutes - expiry_duration_minutes)
+        self.detected_concentration[expired] = 0.0
+        self.detection_time[expired] = np.nan
+        num_expired = np.sum(expired)
+        if num_expired > 0:
+            print(f"{num_expired} detections expired.")
 
 class OilSpillage:
     """
@@ -87,10 +155,19 @@ class OilSpillage:
         self.time_manager = time_manager
         self.logger = logging.getLogger('OilSpillage')
         self.spills = []
-        self.next_spawn_day = 1  # First spawn at Day 1
+        self.next_spawn_day = 0  # First spawn at Day 1
         self.last_expansion_time = None  # Track last expansion time
 
-    def update(self, weather_system):
+    def reset(self):
+        """
+        Resets the oil spills to their initial state.
+        """
+        self.spills = []
+        self.next_spawn_day = self.time_manager.day_count + 1  # Reset to spawn on next day
+        self.last_expansion_time = None
+        self.logger.info("Oil spills have been reset.")
+
+    def update(self, weather_system, dt, current_total_minutes):
         """
         Update oil spills based on time and environmental factors.
         """
@@ -98,7 +175,7 @@ class OilSpillage:
         if self.time_manager.day_count >= self.next_spawn_day:
             self.spawn_new_spills()
             # Choose next spawn day: current day + random(1..3)
-            self.next_spawn_day = self.time_manager.day_count + random.randint(1, 3)
+            self.next_spawn_day = self.time_manager.day_count + random.randint(1, 2)
 
         # Check if it's time to expand spills
         current_total_minutes = (
@@ -109,20 +186,20 @@ class OilSpillage:
         if self.last_expansion_time is None:
             self.last_expansion_time = current_total_minutes
 
-        # Every hour, update spills
-        if current_total_minutes - self.last_expansion_time >= 180:
+        # Every 3 hours, update spills
+        if (current_total_minutes - self.last_expansion_time) >= (3*60):
             self.last_expansion_time = current_total_minutes
             wind_dir = weather_system.current_state.wind_direction
             wind_speed = weather_system.current_state.wind_speed
             temperature = weather_system.current_state.temperature
             wind_dx, wind_dy = self.get_wind_vector(wind_dir, wind_speed)
-            self.update_spills(wind_dx, wind_dy, temperature)
+            self.update_spills(wind_dx, wind_dy, temperature, dt, current_total_minutes)
 
     def spawn_new_spills(self):
         """
         Spawn new spills at random locations on water.
         """
-        num_spills = random.randint(1, 4)
+        num_spills = random.randint(3, 6)
         for _ in range(num_spills):
             block_cells = self.find_random_4cell_block()
             if not block_cells:
@@ -146,7 +223,7 @@ class OilSpillage:
                 return coords
         return None
 
-    def update_spills(self, wind_dx, wind_dy, temperature):
+    def update_spills(self, wind_dx, wind_dy, temperature, dt, current_total_minutes):
         """
         Update each spill's spread and evaporation.
         """
@@ -154,6 +231,9 @@ class OilSpillage:
         for spill in self.spills:
             spill.spread(wind_dx, wind_dy)
             spill.evaporate_and_dissolve(temperature)
+            spill.update_status(current_total_minutes)
+            current_time = self.time_manager.current_sim_time
+            spill.expire_detections(current_time)
             if spill.is_active():
                 active_spills.append(spill)
             else:
@@ -181,29 +261,56 @@ class OilSpillage:
         # Ensure concentration values are between 0 and 1
         total_concentration = np.clip(total_concentration, 0, 1)
         return total_concentration
+    
+    def combined_detected_concentration(self):
+        """
+        Combine detected oil concentrations from all active spills.
+        """
+        w, h = self.environment.grid_width, self.environment.grid_height
+        total_detected = np.zeros((w, h), dtype=float)
+        for spill in self.spills:
+            total_detected += spill.detected_concentration
+        # Ensure values are between 0 and 1
+        total_detected = np.clip(total_detected, 0, 1)
+        return total_detected
 
     def get_cell_color(self, concentration):
         """
         Map oil concentration to a color for rendering.
-        The color starts as dark purple at high concentration and
-        becomes lighter as the concentration decreases.
+        Returns a more visible purple color for undetected oil.
         """
         # Define the color for maximum concentration (dark purple)
-        max_concentration_color = np.array([39, 4, 51])  # RGB values for dark purple
+        max_concentration_color = np.array([128, 0, 128])  # More visible purple
 
-        # Define the color for minimum concentration (lightest acceptable color)
-        min_concentration_color = np.array([169, 17, 222])  # Lighter purple or near transparent
+        # Define the color for minimum concentration (lighter purple)
+        min_concentration_color = np.array([200, 100, 200])  # Lighter purple
 
         # Normalize concentration to range [0,1]
         norm_concentration = np.clip(concentration, 0, 1)
 
-        # Invert concentration to have dark color at high concentrations
-        inverted_concentration = norm_concentration
-
         # Interpolate between min and max colors
-        color = inverted_concentration * max_concentration_color + (1 - inverted_concentration) * min_concentration_color
+        color = norm_concentration * max_concentration_color + (1 - norm_concentration) * min_concentration_color
 
         # Ensure values are within valid RGB range
         color = np.clip(color, 0, 255).astype(int)
 
         return tuple(color)
+    
+
+    def mark_cell_detected(self, gx, gy, detection_time_minutes):
+        """
+        Marks a specific cell as detected across all spills.
+        """
+        detection_found = False
+        for spill in self.spills:
+            if 0 <= gx < spill.grid_width and 0 <= gy < spill.grid_height:
+                if spill.concentration[gx, gy] > 0:
+                    spill.detected_concentration[gx, gy] = spill.concentration[gx, gy]
+                    spill.detection_time[gx, gy] = detection_time_minutes
+                    detection_found = True
+                    print(f"Oil detected and marked at cell ({gx}, {gy}) with concentration {spill.concentration[gx, gy]:.2f}")
+        
+        if detection_found:
+            self.logger.info(f"Cell ({gx}, {gy}) marked as detected.")
+
+    

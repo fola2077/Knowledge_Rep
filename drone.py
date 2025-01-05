@@ -8,20 +8,23 @@ import time
 import pygame
 from pygame.math import Vector2
 from config import WIDTH, HEIGHT, CELL_SIZE
+from environment import WATER_LEVEL
 import logging
 
 class Drone:
-    def __init__(self, id, position, weather_system, rotor_speed=1.0, color=(255, 0, 0)):
+    def __init__(self, id, position, environment, weather_system, time_manager, color=(255, 0, 0)):
         """
         Initialize the drone with an ID, position, rotor speed, color, and reference to WeatherSystem.
         """
         self.id = id
         self.position = Vector2(position)  # (x, y) tuple
-        self.rotor_speed = rotor_speed
+        self.movement_speed = 10.0  # Movement speed in pixels per frame
         self.color = color
         self.neighbors = []
-        self.environment = None  # To be loaded later
+        self.environment = environment 
+        self.oil_spillage_manager = None # To be loaded later
         self.weather_system = weather_system  # Reference to WeatherSystem
+        self.time_manager = time_manager
         self.log_file = 'drone_stats.csv'
         self.initialize_logging()
 
@@ -51,14 +54,21 @@ class Drone:
         Log drone actions to a CSV file and the drone-specific log file.
         """
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        if action =="Move":
+        if action == "Move":
             with open(self.log_file, mode='a', newline='') as file:
                 writer = csv.writer(file)
-                            # Extract position data from details
-                position_str = details.split("Moved to ")[1].strip("()")
-                pos_x, pos_y = position_str.split(", ")
-                writer.writerow([timestamp, self.id, float(pos_x), float(pos_y)])
-        #     writer.writerow([timestamp, self.id, action, details])
+                # Extract position data from details
+                try:
+                    position_str = details.split("Moved to ")[1].strip("()")
+                    pos_x, pos_y = position_str.split(", ")
+                    writer.writerow([timestamp, self.id, float(pos_x), float(pos_y)])
+                except IndexError:
+                    # Handle unexpected format
+                    writer.writerow([timestamp, self.id, "N/A", "N/A"])
+        elif action == "Oil Detected":
+            with open(self.log_file, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow([timestamp, self.id, "Oil Detected", details])
         # self.logger.info(f"{action} - {details}")
 
     def to_dict(self):
@@ -68,34 +78,31 @@ class Drone:
         return {
             'id': self.id,
             'position': (self.position.x, self.position.y),
-            'rotor_speed': self.rotor_speed
             # Add other relevant attributes if necessary
         }
 
     @classmethod
-    def from_dict(cls, data, weather_system):
-        """
-        Create a Drone instance from a dictionary.
-        """
+    def from_dict(cls, data, environment, weather_system, time_manager):
         position = data['position']
-        rotor_speed = data.get('rotor_speed', 1.0)
-        drone = cls(id=data['id'], position=position, weather_system=weather_system, rotor_speed=rotor_speed)
-        # Load other attributes if necessary
+        drone = cls(
+            id=data['id'],
+            position=position,
+            environment=environment,
+            weather_system=weather_system,
+            time_manager=time_manager,
+        )
         return drone
 
     def move(self, dx, dy, drones, collision_radius=10):
         """
-        Move the drone by dx and dy, ensuring no collision with other drones and staying within boundaries.
-        
-        Parameters:
-            dx (float): Movement in the x-direction.
-            dy (float): Movement in the y-direction.
-            drones (list): List of all drone instances.
-            collision_radius (float): Minimum allowed distance between drones to avoid collision.
+        Moves the drone by (dx, dy) while checking for collisions with other drones.
         """
         # Calculate the movement vector scaled by rotor speed
-        movement = Vector2(dx, dy) * self.rotor_speed
-
+        direction = Vector2(dx, dy)
+        if direction.length() > 0:
+            movement = direction.normalize() * self.movement_speed
+        else:
+            movement = Vector2(0, 0)
         # Calculate the proposed new position
         proposed_position = self.position + movement
 
@@ -114,17 +121,7 @@ class Drone:
 
         # No collision detected; update the drone's position
         self.position = proposed_position
-        print(f"Drone {self.id} moved to ({self.position.x:.2f}, {self.position.y:.2f}).")
         self.log_action("Move", f"Moved to ({self.position.x:.2f}, {self.position.y:.2f})")
-
-    def adjust_rotor_speed(self, factor):
-        """
-        Adjust the rotor speed based on a factor.
-        """
-        old_speed = self.rotor_speed
-        self.rotor_speed = max(0.1, min(self.rotor_speed * factor, 5.0))  # Clamp between 0.1 and 5.0
-        print(f"Drone {self.id} rotor speed adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}.")
-        # self.log_action("Rotor Speed Adjustment", f"Adjusted from {old_speed:.2f} to {self.rotor_speed:.2f}")
 
     def update_behavior(self):
         """
@@ -142,14 +139,12 @@ class Drone:
         precipitation = current_weather.precipitation_type
         intensity = current_weather.intensity
 
-        # Simple logic: Increase rotor speed in high wind or precipitation
-        if wind_speed > 20 or precipitation in ["Rain", "Stormy"]:
-            self.adjust_rotor_speed(1.1)  # Increase by 10%
-        elif wind_speed < 5 and precipitation == "None":
-            self.adjust_rotor_speed(0.9)  # Decrease by 10%
-        else:
-            # Slight adjustment based on intensity
-            self.adjust_rotor_speed(1 + 0.05 * (intensity - 0.5))
+            
+        # Adjust behavior based on adverse weather
+        if self.is_weather_adverse():
+            # For instance, the drone might decide to return to land
+            self.return_to_land()
+
 
     def find_neighbors(self, drones, neighbor_radius=100):
         """
@@ -185,6 +180,148 @@ class Drone:
         print(f"Drone {self.id} received info: {info}")
         # self.log_action("Information Received", f"Received info: {info}")
 
+    def is_weather_adverse(self):
+        """
+        Determines if the current weather conditions are adverse for the drone.
+        Returns True if the weather is adverse, False otherwise.
+        """
+        current_weather = self.weather_system.get_current_weather()
+        wind_speed = current_weather.wind_speed
+        visibility = current_weather.visibility
+        # Define thresholds (adjust these values based on your environment)
+        high_wind_speed = 30.0  # Wind speed above which it's considered adverse
+        low_visibility = 0.25   # Visibility below which it's considered adverse
+        if wind_speed > high_wind_speed or visibility < low_visibility:
+            return True
+        return False
+
+    def find_nearest_land_position(self):
+        """
+        Finds the nearest land cell to the drone's current position.
+        Returns a Vector2 position representing the nearest land cell's world coordinates.
+        """
+        if self.environment is None:
+            print("Environment not loaded.")
+            return None
+
+        grid_x = int(self.position.x // CELL_SIZE)
+        grid_y = int(self.position.y // CELL_SIZE)
+
+        min_distance_sq = None
+        nearest_land_cell = None
+
+        for x in range(self.environment.grid_width):
+            for y in range(self.environment.grid_height):
+                if self.environment.grid[x, y] > WATER_LEVEL:
+                    dx = x - grid_x
+                    dy = y - grid_y
+                    distance_sq = dx * dx + dy * dy  # Squared distance
+                    if min_distance_sq is None or distance_sq < min_distance_sq:
+                        min_distance_sq = distance_sq
+                        nearest_land_cell = (x, y)
+
+        if nearest_land_cell is not None:
+            # Convert grid cell back to world coordinates
+            land_x = (nearest_land_cell[0] + 0.5) * CELL_SIZE
+            land_y = (nearest_land_cell[1] + 0.5) * CELL_SIZE
+            return Vector2(land_x, land_y)
+        else:
+            print("No land found in the environment.")
+            return None
+
+    def move_towards(self, target_position, max_distance):
+        """
+        Moves the drone towards the target_position by up to max_distance.
+        Parameters:
+            target_position: Vector2 representing the destination.
+            max_distance: The maximum distance the drone can move in this step.
+        """
+        direction = target_position - self.position
+        distance = direction.length()
+        if distance > 0:
+            movement = direction.normalize() * min(max_distance, distance)
+            self.position += movement
+        else:
+            print(f"Drone {self.id} is already at the target position.")
+            # Optionally, implement what should happen if the drone has reached land
+
+    def return_to_land(self):
+        """
+        Moves the drone towards the nearest land position.
+        """
+        nearest_land_position = self.find_nearest_land_position()
+        if nearest_land_position:
+            # Define the maximum distance the drone can move in one step
+            max_distance = 5.0
+            self.move_towards(nearest_land_position, max_distance)
+            print(f"Drone {self.id} moving towards land at position ({nearest_land_position.x:.2f}, {nearest_land_position.y:.2f}).")
+            # Log the action if desired
+            # self.log_action("Return to Land", f"Moving towards ({nearest_land_position.x:.2f}, {nearest_land_position.y:.2f})")
+
+    def get_sensor_readings(self):
+        """
+        Simulates sensor readings for oil detection at the drone's current position.
+        Returns a dictionary of sensor data.
+        """
+        sensor_data = {}
+
+        # Ensure the oil_spillage_manager is available
+        if self.oil_spillage_manager is None:
+            print("Oil spillage manager not loaded.")
+            sensor_data['oil_detected'] = False
+            sensor_data['oil_concentration'] = 0.0
+            return sensor_data
+
+        # Assume the drone has an oil detection sensor
+        grid_x = int(self.position.x // CELL_SIZE)
+        grid_y = int(self.position.y // CELL_SIZE)
+        
+        if 0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height:
+            oil_concentration_grid = self.oil_spillage_manager.combined_oil_concentration()
+            detected_concentration = oil_concentration_grid[grid_x, grid_y]
+            
+            # Simulate detection probability or sensor noise
+            detection_probability = 1.0  # 90% chance to detect oil if present
+            if random.random() < detection_probability:
+                sensor_data['oil_detected'] = detected_concentration > 0
+                sensor_data['oil_concentration'] = detected_concentration
+                if sensor_data['oil_detected']:
+        #             # Obtain current simulation time
+        #             current_time = self.time_manager.current_sim_time
+        #             # Mark the cell as detected in the oil spill with detection_time
+        #             self.oil_spillage_manager.mark_cell_detected(grid_x, grid_y, current_time)
+                    pass
+            else:
+                sensor_data['oil_detected'] = False
+                sensor_data['oil_concentration'] = 0.0
+        else:
+            sensor_data['oil_detected'] = False
+            sensor_data['oil_concentration'] = 0.0
+        
+        return sensor_data  
+
+    def get_environmental_sensors(self):
+        """
+        Simulates environmental sensors such as wind speed and visibility.
+        Returns a dictionary of environmental sensor data.
+        """
+        sensor_data = {}
+        current_weather = self.weather_system.get_current_weather()
+        
+        # Simulate sensor readings with potential noise
+        sensor_data['wind_speed'] = current_weather.wind_speed + random.gauss(0, 0.5)
+        sensor_data['visibility'] = current_weather.visibility + random.gauss(0, 0.05)
+        sensor_data['precipitation'] = current_weather.precipitation_type
+        
+        return sensor_data  
+    
+    def reset_sensors(self):
+        """
+        Resets sensor readings to their initial state. Useful when resetting the environment.
+        """
+        # Reset any sensor state if necessary
+        pass  # If your sensors don't maintain state, this can be left empty
+
     def report_status(self):
         """
         Report current status.
@@ -192,7 +329,6 @@ class Drone:
         status = {
             "id": self.id,
             "position": self.position,
-            "rotor_speed": self.rotor_speed,
             "weather_forecast": self.weather_system.current_state.name if self.weather_system.current_state else None,
             "neighbors": [drone.id for drone in self.neighbors]
         }
@@ -200,11 +336,12 @@ class Drone:
         # self.log_action("Status Report", f"{status}")
         return status
 
-    def load_environment(self, environment):
+    def load_environment(self, environment, oil_spillage_manager):
         """
         Load and interact with environment data.
         """
         self.environment = environment
+        self.oil_spillage_manager = oil_spillage_manager
         print(f"Drone {self.id} loaded environment data.")
         # self.log_action("Environment Load", f"Loaded environment data")
 
@@ -230,20 +367,39 @@ class Drone:
             # self.log_action("Environment Info Retrieval Failed", "No environment data loaded")
             return None
 
-    def detect_oil(self, detection_threshold=10):
-        """
-        Detect if oil is present at the drone's current location.
-
-        Parameters:
-            detection_threshold: Oil concentration threshold for detection.
-        """
-        if self.environment and self.environment.oil_spill:
+    def detect_oil(self, detection_threshold=0.01, dynamic_radius=True):
+        sensor_data = self.get_sensor_readings()
+        if sensor_data['oil_detected']:
             grid_x = int(self.position.x // CELL_SIZE)
             grid_y = int(self.position.y // CELL_SIZE)
-            if 0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height:
-                oil_concentration = self.environment.oil_spill.grid[grid_x, grid_y]
-                if oil_concentration > detection_threshold:
-                    print(f"Drone {self.id} detected oil at ({grid_x}, {grid_y}) with concentration {oil_concentration:.2f}")
-                    self.log_action('Oil Detected', f"Detected at grid ({grid_x}, {grid_y})")
-                    # Implement response, e.g., logging, alerting, adjusting behavior
-    
+            detection_radius = self.calculate_dynamic_radius() if dynamic_radius else 2
+            detection_found = False
+            current_time = self.time_manager.get_current_total_minutes()
+
+            self.oil_spillage_manager.mark_cell_detected(grid_x, grid_y, current_time)
+            detection_found = True
+            for dx in range(-detection_radius, detection_radius + 1):
+                for dy in range(-detection_radius, detection_radius + 1):
+                    gx = grid_x + dx
+                    gy = grid_y + dy
+                    # Skip current cell (marked)
+                    if dx == 0 and dy == 0 :
+                        continue
+                    if (0 <= gx < self.environment.grid_width and 
+                        0 <= gy < self.environment.grid_height):
+                        
+                        concentration = self.oil_spillage_manager.combined_oil_concentration()[gx, gy]
+                        
+                        if concentration > detection_threshold:
+                            self.oil_spillage_manager.mark_cell_detected(gx, gy, current_time)
+            
+            if detection_found:
+                self.log_action('Oil Detected', f"Detected within radius {detection_radius}")
+                return True
+        return False
+
+    def calculate_dynamic_radius(self):
+        # Example: Increase radius under adverse weather
+        if self.is_weather_adverse():
+            return 3
+        return 2

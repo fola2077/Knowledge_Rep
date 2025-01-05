@@ -35,6 +35,7 @@ class Environment:
         self.num_buildings = num_buildings
         self.cell_size = 10  # Ensure consistency with main.py
         self.oil_spill = None  # Initialize with no oil spill
+        self.oil_spillage_manager = None  
 
         # Set up a module-specific logger
         self.logger = logging.getLogger('Environment')
@@ -153,6 +154,9 @@ class Environment:
             self.log_action("Environment Loaded", f"Loaded from '{filename}'")
             self.print_grid_stats()
             return environment_data  # Return full data for main.py to handle drones
+
+    def set_oil_spillage_manager(self, oil_spillage_manager):
+        self.oil_spillage_manager = oil_spillage_manager
 
     def print_grid_stats(self):
         print("=== Grid Statistics ===")

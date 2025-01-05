@@ -5,7 +5,7 @@ import sys
 import random
 import numpy as np
 import logging
-
+from pygame.math import Vector2
 from drone import Drone
 from environment import Environment, WATER_LEVEL
 from weather import WeatherSystem, TimeManager
@@ -27,7 +27,7 @@ blue_shades = [
     (0, 0, 255)   # Blue
 ]
 
-DRONE_SPEED_FACTOR = 0.95
+DRONE_SPEED_FACTOR = 2.0
 
 # Initialize Pygame fonts
 pygame.font.init()
@@ -99,16 +99,51 @@ def render_static_environment(environment_surface, environment):
 
 def render_oil_spills(environment_surface, environment, oil_spillage_manager):
     """
-    Render the oil spills based on oil concentration levels.
+    Render the oil spills with different colors for detected and undetected oil.
     """
-    concentration_grid = oil_spillage_manager.combined_oil_concentration()
+    # Get both total and detected concentrations
+    total_concentration = oil_spillage_manager.combined_oil_concentration()
+    detected_concentration = oil_spillage_manager.combined_detected_concentration()
+
     for gx in range(environment.grid_width):
         for gy in range(environment.grid_height):
-            concentration = concentration_grid[gx, gy]
+            concentration = total_concentration[gx, gy]
+            detected = detected_concentration[gx, gy]
+            
             if concentration > 0:
-                color = oil_spillage_manager.get_cell_color(concentration)
                 rect = pygame.Rect(gx * CELL_SIZE, gy * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                pygame.draw.rect(environment_surface, color, rect)
+                
+                if detected > 0:
+                    # Bright green for detected oil
+                    color = (0, 255, 0) # Full green
+                    pygame.draw.rect(environment_surface, color, rect)
+                    # Add a border to make it more visible
+                    pygame.draw.rect(environment_surface, (255, 255, 255), rect, 1)
+                else:
+                    # Purple for undetected oil
+                    color = oil_spillage_manager.get_cell_color(concentration)
+                    pygame.draw.rect(environment_surface, color, rect)
+
+def render_oil_legend(screen):
+    """
+    Render a legend showing what the colors mean.
+    """
+    font = pygame.font.Font(None, 24)
+    legend_items = [
+        ("Undetected Oil", (128, 0, 128)),  # Purple
+        ("Detected Oil", (0, 255, 0))       # Green
+    ]
+    
+    y_offset = 10
+    for text, color in legend_items:
+        # Draw color square
+        pygame.draw.rect(screen, color, (10, y_offset, 20, 20))
+        # Draw text
+        text_surface = font.render(text, True, (255, 255, 255))
+        screen.blit(text_surface, (35, y_offset))
+        y_offset += 30
+
+
 
 def main():
     pygame.init()
@@ -120,6 +155,13 @@ def main():
     environment = Environment(load_from_file=True)
     time_manager = TimeManager()
     weather_system = WeatherSystem(time_manager)
+
+    # Add this to your main rendering loop:
+    render_oil_legend(screen)
+
+    # Create the block-based OilSpillage manager
+    oil_spillage_manager = OilSpillage(environment, time_manager)
+    environment.set_oil_spillage_manager(oil_spillage_manager)
 
     logging.info("Simulation started (Block-based OilSpillage).")
 
@@ -145,24 +187,26 @@ def main():
         drone = Drone(
             id=i,
             position=(x, y),
+            environment=environment,
             weather_system=weather_system,
+            time_manager=time_manager,
             color=DRONE_COLOR
         )
-        drone.load_environment(environment)
+        drone.load_environment(environment, oil_spillage_manager)
         drones.append(drone)
         logging.info(f"Drone {i} at position ({x}, {y}).")
 
     environment.drones = drones
 
-    # # Create the block-based OilSpillage manager
-    oil_spillage_manager = OilSpillage(environment, time_manager)
-
     environment_surface = pygame.Surface((WIDTH, HEIGHT))
     render_static_environment(environment_surface, environment)
+
+    current_sim_time = time_manager.current_sim_time
 
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0  # seconds
+        current_sim_time += dt
 
         # Pygame events
         for event in pygame.event.get():
@@ -173,8 +217,12 @@ def main():
         time_manager.update(dt)
         weather_system.update(dt)
 
+        # Get current total minutes from time manager
+        current_total_minutes = time_manager.get_current_total_minutes()
+        current_sim_time = time_manager.current_sim_time  # If needed elsewhere
+
         # 1) Update oil spillage
-        oil_spillage_manager.update(weather_system)
+        oil_spillage_manager.update(weather_system, dt, current_total_minutes)
 
         # 2) Update drones
         for drone in drones:
@@ -184,10 +232,18 @@ def main():
         for drone in drones:
             drone.update_behavior()
 
-            movement_per_second = CELL_SIZE * DRONE_SPEED_FACTOR
-            dx = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt)
-            dy = int(random.randint(-CELL_SIZE, CELL_SIZE) * movement_per_second * dt)
+            movement_speed = DRONE_SPEED_FACTOR * dt
+            # Generate random directions
+            direction = Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+            if direction.length() > 0:
+                direction = direction.normalize()
+                dx, dy = direction.x * movement_speed, direction.y * movement_speed
+            else:
+                dx, dy = 0, 0
             drone.move(dx, dy, drones)
+
+            # # Detect oil multiple times per frame for better coverage
+            # for _ in range(3):  # Check multiple times per frame
             drone.detect_oil()
 
         # Render environment

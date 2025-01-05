@@ -1,5 +1,5 @@
 # Weather Class
-
+import logging
 import pygame
 import random
 import math
@@ -46,10 +46,12 @@ class TimeManager:
         self.season = "Rainy"  # Start with Rainy season
         self.season_duration = 30  # Days per season
         self.day_count = 0
+        self.current_sim_time = 0.0  # Current simulation time in seconds
 
     def update(self, dt):
         """Update the time of day."""
         self.minute += dt * 10  # Accelerated time progression
+        self.current_sim_time += dt # Track total simulation time
         if self.minute >= 60:
             self.minute = 0
             self.hour += 1
@@ -79,6 +81,12 @@ class TimeManager:
         """Trigger events that occur every hour."""
         # Placeholder for any hourly events (e.g., logging)
         pass
+
+    def get_current_total_minutes(self):
+        """
+        Returns the total simulation time in minutes.
+        """
+        return self.day_count * 24 * 60 + self.hour * 60 + self.minute
 
 # Weather State Definition
 class WeatherState:
@@ -244,12 +252,21 @@ class WeatherSystem:
     def __init__(self, time_manager):
         self.time_manager = time_manager
 
+                # Initialize logger
+        self.logger = logging.getLogger('WeatherSystem')
+        weather_handler = logging.FileHandler('weather_system.log')
+        weather_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        weather_handler.setFormatter(formatter)
+        self.logger.addHandler(weather_handler)
+        self.logger.propagate = False  # Prevent log messages from being duplicated
+
         # Define possible weather states
         self.states = {
             "Sunny": WeatherState(
                 "Sunny",
-                temperature_range=(25, 35),
-                humidity_range=(30, 50),
+                temperature_range=(28, 35),
+                humidity_range=(60, 80),
                 wind_speed_range=(5, 15),
                 precipitation_type="None",
                 visibility_range=(1.0, 0.8), # minimal impact on visibility
@@ -257,11 +274,11 @@ class WeatherSystem:
             ),
             "Rainy": WeatherState(
                 "Rainy",
-                temperature_range=(20, 30),
-                humidity_range=(70, 100),
-                wind_speed_range=(10, 25),
+                temperature_range=(24, 30),
+                humidity_range=(80, 100),
+                wind_speed_range=(5, 20),
                 precipitation_type="Rain",
-                visibility_range=(0.6, 0.3), # reduced visibility with higher intensity
+                visibility_range=(0.7, 0.4), # reduced visibility with higher intensity
                 cloud_density=0.7
             ),
             "Foggy": WeatherState(
@@ -270,25 +287,25 @@ class WeatherSystem:
                 humidity_range=(80, 100),
                 wind_speed_range=(0, 5),
                 precipitation_type="None",
-                visibility_range = (0.4, 0.1), # very low visibility
+                visibility_range = (0.6, 0.3), # very low visibility
                 cloud_density=0.5
             ),
             "Stormy": WeatherState(
                 "Stormy",
                 temperature_range=(18, 28),
-                humidity_range=(75, 100),
-                wind_speed_range=(20, 40),
+                humidity_range=(85, 100),
+                wind_speed_range=(15, 30),
                 precipitation_type="Rain",
-                visibility_range=(0.5, 0.2), # reduced visibility with higher intensity
+                visibility_range=(0.4, 0.2), # reduced visibility with higher intensity
                 cloud_density=0.8
             ),
             "Harmattan": WeatherState(
                 "Harmattan",
-                temperature_range=(15, 25),
-                humidity_range=(20, 40),
-                wind_speed_range=(10, 20),
+                temperature_range=(17, 25),
+                humidity_range=(10, 30),
+                wind_speed_range=(5, 15),
                 precipitation_type="None",
-                visibility_range=(0.7, 0.3), # reduced visibility due to dust
+                visibility_range=(0.6, 0.3), # reduced visibility due to dust
                 cloud_density=0.3
             )
         }
@@ -299,14 +316,14 @@ class WeatherSystem:
         # Define transition probabilities based on current state and intensity
         self.transition_probabilities = {
             "Rainy": {
-                "Sunny": 0.2,
-                "Rainy": 0.5,
+                "Sunny": 0.24,
+                "Rainy": 0.56,
                 "Stormy": 0.2,
                 "Foggy": 0.1
             },
             "Sunny": {
-                "Sunny": 0.6,
-                "Rainy": 0.2,
+                "Sunny": 0.53,
+                "Rainy": 0.27,
                 "Harmattan": 0.1,
                 "Foggy": 0.1
             },
@@ -321,8 +338,8 @@ class WeatherSystem:
                 "Sunny": 0.2
             },
             "Harmattan": {
-                "Harmattan": 0.7,
-                "Sunny": 0.2,
+                "Harmattan": 0.6,
+                "Sunny": 0.3,
                 "Foggy": 0.1
             }
         }
@@ -612,5 +629,17 @@ class WeatherSystem:
 
         # Blit the semi-transparent weather_surface onto the main surface
         surface.blit(weather_surface, (0, 0))
+
+    def reset(self):
+        """
+        Resets the weather system to its initial state.
+        """
+        self.current_state = self.initialize_state()
+        self.transition_timer = 0
+        self.last_logged_hour = None
+        self.raindrops = [Raindrop() for _ in range(200)]
+        self.lightning = LightningStrike()
+        self.clouds = [Cloud() for _ in range(10)]
+        self.logger.info("Weather system has been reset.")
 
 
