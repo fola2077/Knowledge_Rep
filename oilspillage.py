@@ -116,7 +116,7 @@ class OilSpill:
             self.status = 'stopped'
             print("Oil spill spread has been stopped as 50% has been detected.")
         
-        if self.status == 'stopped' and detection_ratio >= 0.6:
+        if self.status == 'stopped' and detection_ratio >= 0.8:
             self.status = 'pending_removal'
             self.pending_removal_start_time = current_total_minutes
             print("All oil spill has been detected. Will remove in 3 simulation hours.")

@@ -242,8 +242,7 @@ def main():
                 dx, dy = 0, 0
             drone.move(dx, dy, drones)
 
-            # # Detect oil multiple times per frame for better coverage
-            # for _ in range(3):  # Check multiple times per frame
+
             drone.detect_oil()
 
         # Render environment

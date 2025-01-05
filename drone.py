@@ -25,6 +25,7 @@ class Drone:
         self.oil_spillage_manager = None # To be loaded later
         self.weather_system = weather_system  # Reference to WeatherSystem
         self.time_manager = time_manager
+        self.detected_cells = set()
         self.log_file = 'drone_stats.csv'
         self.initialize_logging()
 
@@ -160,25 +161,20 @@ class Drone:
         # self.log_action("Neighbor Update", f"Found {len(self.neighbors)} neighbors")
 
     def share_information(self):
-        """
-        Share information with neighbors.
-        """
         if self.neighbors:
-            info = f"Drone {self.id}: Position {self.position}"
+            new_info = {
+                "detected_cells": self.detected_cells
+            }
             for neighbor in self.neighbors:
-                neighbor.receive_information(info)
-            print(f"Drone {self.id} shared info with {len(self.neighbors)} neighbors.")
-            self.log_action("Information Sharing", f"Shared info with {len(self.neighbors)} neighbors")
-        else:
-            print(f"Drone {self.id} has no neighbors to share information with.")
-            # self.log_action("Information Sharing", "No neighbors to share information with")
+                neighbor.receive_information(new_info)
+            print(f"Drone {self.id} shared detection info with {len(self.neighbors)} neighbors.")
 
     def receive_information(self, info):
-        """
-        Receive information from another drone.
-        """
-        print(f"Drone {self.id} received info: {info}")
-        # self.log_action("Information Received", f"Received info: {info}")
+        # Merge the info into our own records
+        if "detected_cells" in info:
+            for cell in info["detected_cells"]:
+                self.detected_cells.add(cell)
+        print(f"Drone {self.id} received new detection info from another drone.")
 
     def is_weather_adverse(self):
         """
@@ -190,7 +186,7 @@ class Drone:
         visibility = current_weather.visibility
         # Define thresholds (adjust these values based on your environment)
         high_wind_speed = 30.0  # Wind speed above which it's considered adverse
-        low_visibility = 0.25   # Visibility below which it's considered adverse
+        low_visibility = 0.20   # Visibility below which it's considered adverse
         if wind_speed > high_wind_speed or visibility < low_visibility:
             return True
         return False
@@ -258,47 +254,136 @@ class Drone:
             # Log the action if desired
             # self.log_action("Return to Land", f"Moving towards ({nearest_land_position.x:.2f}, {nearest_land_position.y:.2f})")
 
+    def get_weather_penalty(self):
+        """
+        Returns a penalty score based on multiple factors:
+        wind speed, precipitation, cloud density, and also
+        special conditions (Foggy, Harmattan).
+        """
+        current_weather = self.weather_system.get_current_weather()
+        if not current_weather:
+            return 0.0
+
+        # --- Extract Weather Attributes ---
+        wind_speed = current_weather.wind_speed
+        precipitation_type = current_weather.precipitation_type  # e.g. "Rain", "None", "Thunderstorm"
+        cloud_density = current_weather.cloud_density
+        weather_name = current_weather.name  # e.g. "Foggy", "Harmattan", "Sunny", "Stormy", etc.
+
+        # --- Convert Precipitation to Numeric ---
+        precip_map = {
+            'None': 0,
+            'Rain': 1,
+            'Thunderstorm': 2,
+            '': 0  # fallback if blank
+        }
+        precip_value = precip_map.get(precipitation_type, 0)
+
+        # --- Weighted Sum for Basic Factors ---
+        # Adjust these weights as needed
+        w_wind = 0.3
+        w_precip = 0.5
+        w_cloud = 0.2
+
+        raw_score = (w_wind * wind_speed) + (w_precip * precip_value) + (w_cloud * cloud_density)
+
+        # --- Additional Penalties for Foggy / Harmattan ---
+        # We can interpret these as non-precipitation phenomena that hamper detection.
+        # E.g., Foggy => reduces visibility. Harmattan => dust haze.
+        # We'll just treat them as an extra additive penalty.
+        if weather_name == "Foggy":
+            # Fog can be pretty bad, especially if humidity is high
+            # Example: add 1.0 to raw_score
+            raw_score += 1.0
+        elif weather_name == "Harmattan":
+            # Dust haze
+            # Example: add 1.5 if we want it worse than standard fog
+            raw_score += 1.5
+
+        # The higher the raw_score, the worse the weather.
+        return raw_score
+
+    @staticmethod
+    def logistic(x):
+        """
+        Simple logistic function: Maps (-∞..∞) -> (0..1).
+        """
+        return 1 / (1 + math.exp(-x))
+
+    def get_weather_modifier(self):
+        """
+        Takes the raw weather penalty and converts it to a [0..1] multiplier
+        using a logistic curve. Higher penalty => smaller multiplier.
+        """
+        raw_score = self.get_weather_penalty()
+
+        # We invert the sign so a higher raw_score => lower factor
+        # factor = logistic(-a * (raw_score - b))
+        # 'a' is slope, 'b' is offset
+        a = 1.0  # slope
+        b = 3.0  # offset
+
+        factor = Drone.logistic(-a * (raw_score - b))
+        return factor
+    
+    def thickness_factor(self, oil_concentration):
+        """
+        Non-linear scale for oil thickness from 0..1 => factor 0..1
+        Example: logistic or exponential approach 
+        so that very low concentration yields a big penalty.
+        """
+        # If the cell is nearly 0.0 concentration, the factor ~ 0.
+        # If near 1.0 concentration, factor ~ 1.0
+        # Let's do a simple exponential approach:
+        # factor = 1 - exp(-5 * oil_concentration)
+        # At concentration=0.1 => factor ~ 1 - e^-0.5 => ~0.39
+        # At concentration=0.5 => factor ~ 1 - e^-2.5 => ~0.92
+        # Just an example
+        return 1.0 - math.exp(-5 * oil_concentration)
+
+
     def get_sensor_readings(self):
         """
         Simulates sensor readings for oil detection at the drone's current position.
         Returns a dictionary of sensor data.
         """
-        sensor_data = {}
+        sensor_data = {
+            'oil_detected': False,
+            'oil_concentration': 0.0
+        }
 
         # Ensure the oil_spillage_manager is available
         if self.oil_spillage_manager is None:
             print("Oil spillage manager not loaded.")
-            sensor_data['oil_detected'] = False
-            sensor_data['oil_concentration'] = 0.0
             return sensor_data
 
         # Assume the drone has an oil detection sensor
         grid_x = int(self.position.x // CELL_SIZE)
         grid_y = int(self.position.y // CELL_SIZE)
         
-        if 0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height:
-            oil_concentration_grid = self.oil_spillage_manager.combined_oil_concentration()
-            detected_concentration = oil_concentration_grid[grid_x, grid_y]
-            
-            # Simulate detection probability or sensor noise
-            detection_probability = 1.0  # 90% chance to detect oil if present
-            if random.random() < detection_probability:
-                sensor_data['oil_detected'] = detected_concentration > 0
-                sensor_data['oil_concentration'] = detected_concentration
-                if sensor_data['oil_detected']:
-        #             # Obtain current simulation time
-        #             current_time = self.time_manager.current_sim_time
-        #             # Mark the cell as detected in the oil spill with detection_time
-        #             self.oil_spillage_manager.mark_cell_detected(grid_x, grid_y, current_time)
-                    pass
-            else:
-                sensor_data['oil_detected'] = False
-                sensor_data['oil_concentration'] = 0.0
-        else:
-            sensor_data['oil_detected'] = False
-            sensor_data['oil_concentration'] = 0.0
+        if not (0 <= grid_x < self.environment.grid_width and 0 <= grid_y < self.environment.grid_height):
+            return sensor_data
         
-        return sensor_data  
+        oil_concentration_grid = self.oil_spillage_manager.combined_oil_concentration()
+        detected_concentration = oil_concentration_grid[grid_x, grid_y]
+
+                # Base probability
+        base_probability = 1.0  
+        weather_factor = self.get_weather_modifier()      # logistic-based
+        thickness_factor = self.thickness_factor(detected_concentration)
+
+        # Combine them multiplicatively 
+        # so that if either factor is small, final is small
+        detection_probability = base_probability * weather_factor * thickness_factor
+
+        # clamp to [0..1]
+        detection_probability = max(0.0, min(1.0, detection_probability))
+
+        if random.random() < detection_probability:
+            sensor_data['oil_detected'] = detected_concentration > 0
+            sensor_data['oil_concentration'] = detected_concentration
+
+        return sensor_data
 
     def get_environmental_sensors(self):
         """
@@ -372,6 +457,7 @@ class Drone:
         if sensor_data['oil_detected']:
             grid_x = int(self.position.x // CELL_SIZE)
             grid_y = int(self.position.y // CELL_SIZE)
+            self.detected_cells.add((grid_x, grid_y))
             detection_radius = self.calculate_dynamic_radius() if dynamic_radius else 2
             detection_found = False
             current_time = self.time_manager.get_current_total_minutes()
@@ -403,3 +489,16 @@ class Drone:
         if self.is_weather_adverse():
             return 3
         return 2
+    
+    def scan_for_oil(self, frames=4):
+        """
+        The drone tries detection 'frames' times in one update,
+        representing a more thorough scan.
+        """
+        detection_occurred = False
+        for _ in range(frames):
+            # If detect_oil() returns True once, we break out
+            if self.detect_oil():
+                detection_occurred = True
+                break
+        return detection_occurred

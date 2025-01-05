@@ -460,6 +460,10 @@ class WeatherSystem:
                 # Lower probability to transition if current intensity is high
                 adjusted_probabilities[state] = prob * (1 - intensity)
 
+            # If the current season is "Rainy", set Harmattan = 0.0
+        if self.time_manager.season == "Rainy" and "Harmattan" in adjusted_probabilities:
+            adjusted_probabilities["Harmattan"] = 0.0
+
         # Normalize the probabilities
         total = sum(adjusted_probabilities.values())
         if total == 0:
