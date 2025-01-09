@@ -13,7 +13,7 @@ class OilSpill:
     """
     Represents an individual oil spill.
     """
-    def __init__(self, environment, initial_cells, initial_concentration=1.0):
+    def __init__(self, environment, initial_cells, initial_concentration=1.0, creation_time_minutes=0):
         self.environment = environment
         self.grid_width = environment.grid_width
         self.grid_height = environment.grid_height
@@ -25,6 +25,8 @@ class OilSpill:
         self.time_since_all_detected = 0.0 # In sim hours
         self.detection_time = np.full((self.grid_width, self.grid_height), np.nan)
         self.pending_removal_start_time = None
+        self.detected = False
+        self.creation_time_minutes = creation_time_minutes
 
     def spread(self, wind_dx, wind_dy):
         """
@@ -76,8 +78,8 @@ class OilSpill:
         Reduce the oil concentration based on evaporation and dissolution.
         """
         # Simple evaporation model: evaporation rate increases with temperature
-        evaporation_rate = 0.005 + 0.0005 * (temperature - 15)  # Adjust as needed
-        evaporation_rate = np.clip(evaporation_rate, 0, 0.05)
+        evaporation_rate = 0.0005 + 0.00005 * (temperature - 15)  # Adjust as needed
+        evaporation_rate = np.clip(evaporation_rate, 0, 0.02)
         self.concentration *= (1 - evaporation_rate)
 
     def mark_detected(self, gx, gy):
@@ -105,21 +107,26 @@ class OilSpill:
         """
         total_oil = self.get_total_oil()
         total_detected = self.get_total_detected_oil()
+        detection_ratio = total_detected / total_oil if total_oil > 0 else 0.0
+
+        detection_threshold = 0.90
+
+        self.detected = detection_ratio >= detection_threshold
 
         if total_oil == 0:
             self.status = 'removed'
             return  # No oil left
 
-        detection_ratio = total_detected / total_oil if total_oil > 0 else 0.0
 
         if self.status == 'active' and detection_ratio >= 0.5:
             self.status = 'stopped'
             print("Oil spill spread has been stopped as 50% has been detected.")
         
-        if self.status == 'stopped' and detection_ratio >= 0.8:
+        if self.status == 'stopped' and detection_ratio >= detection_threshold:
             self.status = 'pending_removal'
-            self.pending_removal_start_time = current_total_minutes
-            print("All oil spill has been detected. Will remove in 3 simulation hours.")
+            if self.pending_removal_start_time is None:
+                self.pending_removal_start_time = current_total_minutes
+                print("All oil spill has been detected. Will remove in 3 simulation hours.")
         
         if self.status == 'pending_removal':
             time_in_pending = current_total_minutes - self.pending_removal_start_time
@@ -133,7 +140,7 @@ class OilSpill:
         """
         Check if the spill still has significant oil concentration.
         """
-        return np.any(self.concentration > 0.01) and self.status != 'removed'
+        return np.any(self.concentration > 0.001) and self.status != 'removed'
     
     def expire_detections(self, current_time_minutes, expiry_duration_minutes=6 * 60):
         """
@@ -157,6 +164,9 @@ class OilSpillage:
         self.spills = []
         self.next_spawn_day = 0  # First spawn at Day 1
         self.last_expansion_time = None  # Track last expansion time
+        self.next_spawn_time_minutes = 0
+        self.min_active_spills = 3 # Min number
+        self.max_active_spills = 10
 
     def reset(self):
         """
@@ -164,6 +174,7 @@ class OilSpillage:
         """
         self.spills = []
         self.next_spawn_day = self.time_manager.day_count + 1  # Reset to spawn on next day
+        self.next_spawn_time_minutes = self.time_manager.get_current_total_minutes() # Spawn immediately
         self.last_expansion_time = None
         self.logger.info("Oil spills have been reset.")
 
@@ -171,18 +182,7 @@ class OilSpillage:
         """
         Update oil spills based on time and environmental factors.
         """
-        # Check if we should spawn new spills
-        if self.time_manager.day_count >= self.next_spawn_day:
-            self.spawn_new_spills()
-            # Choose next spawn day: current day + random(1..3)
-            self.next_spawn_day = self.time_manager.day_count + random.randint(1, 2)
 
-        # Check if it's time to expand spills
-        current_total_minutes = (
-            self.time_manager.day_count * 24 * 60 +
-            self.time_manager.hour * 60 +
-            self.time_manager.minute
-        )
         if self.last_expansion_time is None:
             self.last_expansion_time = current_total_minutes
 
@@ -195,18 +195,33 @@ class OilSpillage:
             wind_dx, wind_dy = self.get_wind_vector(wind_dir, wind_speed)
             self.update_spills(wind_dx, wind_dy, temperature, dt, current_total_minutes)
 
-    def spawn_new_spills(self):
+        # Check if we should spawn new spills
+        active_spills_count = len([spill for spill in self.spills if spill.is_active()])
+        if active_spills_count < self.min_active_spills:
+            spills_to_spawn = self.min_active_spills - active_spills_count
+            total_spills_after_spawn = active_spills_count + spills_to_spawn
+            if total_spills_after_spawn > self.max_active_spills:
+                spills_to_spawn = self.max_active_spills - active_spills_count
+            self.spawn_new_spills(spills_to_spawn)
+
+
+    def spawn_new_spills(self, num_spills=None):
         """
         Spawn new spills at random locations on water.
         """
-        num_spills = random.randint(3, 6)
+        if num_spills is None:
+            num_spills = random.randint(5, 9)  # Default behavior
+
+        current_time_minutes = self.time_manager.get_current_total_minutes()
+        
         for _ in range(num_spills):
             block_cells = self.find_random_4cell_block()
             if not block_cells:
                 self.logger.warning("Failed to find a suitable location for new oil spill.")
                 continue
 
-            spill = OilSpill(self.environment, block_cells)
+            # Pass creation_time_minutes to track when the spill was created
+            spill = OilSpill(self.environment, block_cells, creation_time_minutes=current_time_minutes)
             self.spills.append(spill)
             self.logger.info(f"Spawned oil spill at {block_cells}, day={self.time_manager.day_count}")
             print(f"Spawned oil spill at {block_cells}, day={self.time_manager.day_count}")
@@ -249,6 +264,24 @@ class OilSpillage:
         dx = math.cos(wind_radians) * wind_speed * scaling_factor
         dy = math.sin(wind_radians) * wind_speed * scaling_factor
         return dx, dy
+
+    def get_total_oil(self):
+        """
+        Returns the total oil concentration remaining in the environment.
+        """
+        total_oil = 0.0
+        for spill in self.spills:
+            total_oil += np.sum(spill.concentration)
+        return total_oil
+
+    def get_total_detected_oil(self):
+        """
+        Returns the total detected oil concentration.
+        """
+        total_detected = 0.0
+        for spill in self.spills:
+            total_detected += np.sum(spill.detected_concentration)
+        return total_detected
 
     def combined_oil_concentration(self):
         """
@@ -308,9 +341,64 @@ class OilSpillage:
                     spill.detected_concentration[gx, gy] = spill.concentration[gx, gy]
                     spill.detection_time[gx, gy] = detection_time_minutes
                     detection_found = True
-                    print(f"Oil detected and marked at cell ({gx}, {gy}) with concentration {spill.concentration[gx, gy]:.2f}")
+                    print(f"Oil detected and marked at cell ({gx}, {gy}) with concentration {spill.concentration[gx, gy]:.5f}")
         
         if detection_found:
             self.logger.info(f"Cell ({gx}, {gy}) marked as detected.")
 
+    def all_spills_detected(self):
+        """Check if all active spills have been detected."""
+        # Filter out removed spills, as they are no longer active
+        # active_spills = [spill for spill in self.spills if spill.status != 'removed']
+        # if not active_spills:
+        #     print("No active spills remaining.")
+        #     return True  # Continue the episode if no active spills (depends on your desired behavior)
+        # # Return True only if all active spills have been detected
+        # return all(spill.detected for spill in active_spills)
+        return False
+
+    def get_cell_concentration(self, position):
+        """
+        Returns the combined oil concentration at the given world position.
+        """
+        # Convert world position to grid indices
+        gx = int(position.x // CELL_SIZE)
+        gy = int(position.y // CELL_SIZE)
+
+        # Ensure indices are within bounds
+        if 0 <= gx < self.environment.grid_width and 0 <= gy < self.environment.grid_height:
+            total_concentration = 0.0
+            for spill in self.spills:
+                total_concentration += spill.concentration[gx, gy]
+            
+            # Clamp the total concentration to [0, 1]
+            total_concentration = min(total_concentration, 1.0)
+            return total_concentration
+        else:
+            # If position is out of bounds, return zero concentration
+            return 0.0
     
+    def get_time_since_spill(self, position):
+        """
+        Returns the time elapsed since the spill at the given position appeared.
+        """
+        gx = int(position.x // CELL_SIZE)
+        gy = int(position.y // CELL_SIZE)
+        if not (0 <= gx < self.environment.grid_width and 0 <= gy < self.environment.grid_height):
+            print(f"Position ({gx}, {gy}) out of bounds.")
+            return None
+
+        min_time_since_spill = float('inf')
+        found_spill = False
+        for spill in self.spills:
+            if spill.concentration[gx, gy] > 0:
+                found_spill = True
+                time_since_spill = self.time_manager.get_current_total_minutes() - spill.creation_time_minutes
+                if time_since_spill < min_time_since_spill:
+                    min_time_since_spill = time_since_spill
+
+        if not found_spill:
+            print(f"No spill found at grid position ({gx}, {gy})")
+            return None  # No spill at this position
+        else:
+            return min_time_since_spill

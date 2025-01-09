@@ -48,6 +48,17 @@ class TimeManager:
         self.day_count = 0
         self.current_sim_time = 0.0  # Current simulation time in seconds
 
+    def reset(self):
+        """Reset the TimeManager to its initial state."""
+        self.hour = 6  # Start at 6 AM
+        self.minute = 0
+        self.day_duration = 24  # Hours in a day
+        self.season = "Rainy"  # Start with Rainy season
+        self.season_duration = 30  # Days per season
+        self.day_count = 0
+        self.current_sim_time = 0.0  # Current simulation time in seconds
+        print("TimeManager has been reset to initial state.")
+
     def update(self, dt):
         """Update the time of day."""
         self.minute += dt * 10  # Accelerated time progression
@@ -97,6 +108,7 @@ class WeatherState:
         self.temperature = random.uniform(*temperature_range)
         self.humidity = random.uniform(*humidity_range)
         self.wind_speed = random.uniform(*wind_speed_range)
+        self.wind_speed_range = wind_speed_range
         self.wind_direction = random.uniform(0, 360)  # Degrees
         self.precipitation_type = precipitation_type  # e.g., 'None', 'Rain', 'Thunderstorm'
         self.visibility_range = visibility_range  # (max visibility, min visibility)

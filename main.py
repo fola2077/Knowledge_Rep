@@ -11,6 +11,7 @@ from environment import Environment, WATER_LEVEL
 from weather import WeatherSystem, TimeManager
 from oilspillage import OilSpillage  # The new block-based class
 
+from stable_baselines3 import PPO  # <-- Import the trained RL model
 from config import WIDTH, HEIGHT
 
 # Constants
@@ -48,6 +49,7 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
 logging.getLogger().addHandler(console_handler)
 
+
 def render_static_environment(environment_surface, environment):
     """
     Render the static (land, water, buildings) environment to environment_surface.
@@ -56,12 +58,7 @@ def render_static_environment(environment_surface, environment):
 
     for gx in range(environment.grid_width):
         for gy in range(environment.grid_height):
-            rect = pygame.Rect(
-                gx * CELL_SIZE,
-                gy * CELL_SIZE,
-                CELL_SIZE,
-                CELL_SIZE
-            )
+            rect = pygame.Rect(gx * CELL_SIZE, gy * CELL_SIZE, CELL_SIZE, CELL_SIZE)
             elevation = environment.grid[gx, gy]
 
             if elevation > WATER_LEVEL:
@@ -97,11 +94,11 @@ def render_static_environment(environment_surface, environment):
                 rect = pygame.Rect(gx * CELL_SIZE, gy * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                 pygame.draw.rect(environment_surface, (255, 255, 255), rect, 1)
 
+
 def render_oil_spills(environment_surface, environment, oil_spillage_manager):
     """
     Render the oil spills with different colors for detected and undetected oil.
     """
-    # Get both total and detected concentrations
     total_concentration = oil_spillage_manager.combined_oil_concentration()
     detected_concentration = oil_spillage_manager.combined_detected_concentration()
 
@@ -115,7 +112,7 @@ def render_oil_spills(environment_surface, environment, oil_spillage_manager):
                 
                 if detected > 0:
                     # Bright green for detected oil
-                    color = (0, 255, 0) # Full green
+                    color = (0, 255, 0)  # Full green
                     pygame.draw.rect(environment_surface, color, rect)
                     # Add a border to make it more visible
                     pygame.draw.rect(environment_surface, (255, 255, 255), rect, 1)
@@ -123,6 +120,7 @@ def render_oil_spills(environment_surface, environment, oil_spillage_manager):
                     # Purple for undetected oil
                     color = oil_spillage_manager.get_cell_color(concentration)
                     pygame.draw.rect(environment_surface, color, rect)
+
 
 def render_oil_legend(screen):
     """
@@ -136,13 +134,10 @@ def render_oil_legend(screen):
     
     y_offset = 10
     for text, color in legend_items:
-        # Draw color square
         pygame.draw.rect(screen, color, (10, y_offset, 20, 20))
-        # Draw text
         text_surface = font.render(text, True, (255, 255, 255))
         screen.blit(text_surface, (35, y_offset))
         y_offset += 30
-
 
 
 def main():
@@ -151,21 +146,15 @@ def main():
     pygame.display.set_caption("Drone Simulation (Block-based Oil Spillage)")
     clock = pygame.time.Clock()
 
-    # Setup environment, weather, etc.
+    # 1) Setup environment, time, weather, oil spillage
     environment = Environment(load_from_file=True)
     time_manager = TimeManager()
     weather_system = WeatherSystem(time_manager)
-
-    # Add this to your main rendering loop:
-    render_oil_legend(screen)
-
-    # Create the block-based OilSpillage manager
     oil_spillage_manager = OilSpillage(environment, time_manager)
     environment.set_oil_spillage_manager(oil_spillage_manager)
+    logging.info("Visualization started (Block-based OilSpillage).")
 
-    logging.info("Simulation started (Block-based OilSpillage).")
-
-    # Create some drones
+    # 2) Create drones in environment
     num_drones = 5
     drones = []
     land_indices = list(zip(*np.where(environment.land_mask)))
@@ -179,7 +168,6 @@ def main():
         x = gx * CELL_SIZE + CELL_SIZE // 2
         y = gy * CELL_SIZE + CELL_SIZE // 2
 
-        # If building, skip
         if environment.buildings[gx, gy] > 0:
             logging.warning(f"Drone {i} avoided building at ({x}, {y}).")
             continue
@@ -198,57 +186,107 @@ def main():
 
     environment.drones = drones
 
+    # 3) Load the trained RL model
+    try:
+        model = PPO.load("ppo_drone_final_multi")
+        logging.info("Successfully loaded PPO model.")
+    except FileNotFoundError:
+        logging.error("Trained model file not found! Provide correct path to the model.")
+        print("Model file 'ppo_drone_final_multi.zip' not found. Exiting.")
+        pygame.quit()
+        sys.exit()
+
+    # 4) Function to gather observation (matching training env's logic)
+    def get_observation(drones, environment, weather_system, oil_spillage_manager):
+        max_drones = 5
+        features_per_drone = 6
+        obs_array = np.zeros(features_per_drone * max_drones + 1, dtype=np.float32)
+
+        for idx, drone in enumerate(drones):
+            if idx >= max_drones:
+                break
+            x = float(drone.position.x)  # Ensure these are scalar values
+            y = float(drone.position.y)
+            current_weather = weather_system.get_current_weather()
+            wind_speed = float(current_weather.wind_speed)
+            wind_direction = float(current_weather.wind_direction)
+            visibility = float(current_weather.visibility)
+            total_detected_oil = float(oil_spillage_manager.get_total_detected_oil())
+
+            start = idx * features_per_drone
+            obs_array[start : start+6] = [
+                x, y, wind_speed, wind_direction, visibility, total_detected_oil
+            ]
+
+        # Add global feature: total_oil_remaining
+        total_oil_remaining = float(oil_spillage_manager.get_total_oil())
+        obs_array[-1] = total_oil_remaining
+
+        return obs_array.reshape((1, -1))  # Ensure shape is (1, 31)
+
+    # 5) Our partial environment "step" logic, if desired
+    def step_environment(actions):
+        """
+        Applies the actions to the drones, then updates time, weather, spillage, etc.
+        """
+        # Convert actions to movements or scans, replicate training env logic
+        for i, drone in enumerate(drones):
+            act = actions[i]
+            dx, dy = 0.0, 0.0
+
+            if act == 0:  # Up
+                dy = -drone.movement_speed
+            elif act == 1:  # Down
+                dy = drone.movement_speed
+            elif act == 2:  # Left
+                dx = -drone.movement_speed
+            elif act == 3:  # Right
+                dx = drone.movement_speed
+            elif act == 4:
+                # "Scan" action
+                drone.scan_for_oil(frames=4)
+
+            # Move only if act is in [0..3]
+            if act in [0,1,2,3]:
+                drone.move(dx, dy, drones)
+
+        # Update time, weather, spillage for one "tick"
+        dt = 1.0  # or clock.get_time() if you want it in ms
+        time_manager.update(dt)
+        weather_system.update(dt)
+        current_total_minutes = time_manager.get_current_total_minutes()
+        oil_spillage_manager.update(weather_system, dt, current_total_minutes)
+
+    # Legend
+    render_oil_legend(screen)
+
     environment_surface = pygame.Surface((WIDTH, HEIGHT))
-    render_static_environment(environment_surface, environment)
-
-    current_sim_time = time_manager.current_sim_time
-
     running = True
-    while running:
-        dt = clock.tick(FPS) / 1000.0  # seconds
-        current_sim_time += dt
 
-        # Pygame events
+    while running:
+        dt = clock.tick(FPS) / 1000.0
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-        # Update time + weather
-        time_manager.update(dt)
-        weather_system.update(dt)
+        # A) Build observation
+        try:
+            obs = get_observation(drones, environment, weather_system, oil_spillage_manager)
 
-        # Get current total minutes from time manager
-        current_total_minutes = time_manager.get_current_total_minutes()
-        current_sim_time = time_manager.current_sim_time  # If needed elsewhere
+            # B) Model predicts action
+            actions, _states = model.predict(obs, deterministic=True)
+            if isinstance(actions, np.ndarray):
+                actions = actions.squeeze()  # Remove single-dimensional entries
+        except ValueError as e:
+            logging.error(f"Prediction error: {e}")
+            actions = np.zeros(len(drones))  # Default actions
+            
+        # C) Step environment with these actions
+        step_environment(actions)
 
-        # 1) Update oil spillage
-        oil_spillage_manager.update(weather_system, dt, current_total_minutes)
-
-        # 2) Update drones
-        for drone in drones:
-            drone.find_neighbors(drones)
-        for drone in drones:
-            drone.share_information()
-        for drone in drones:
-            drone.update_behavior()
-
-            movement_speed = DRONE_SPEED_FACTOR * dt
-            # Generate random directions
-            direction = Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
-            if direction.length() > 0:
-                direction = direction.normalize()
-                dx, dy = direction.x * movement_speed, direction.y * movement_speed
-            else:
-                dx, dy = 0, 0
-            drone.move(dx, dy, drones)
-
-
-            drone.detect_oil()
-
-        # Render environment
+        # D) Render environment
         render_static_environment(environment_surface, environment)
-
-        # Render block-based oil
         render_oil_spills(environment_surface, environment, oil_spillage_manager)
 
         # Render drones
@@ -262,7 +300,7 @@ def main():
             id_text = FONT.render(str(drone.id), True, INFO_COLOR)
             environment_surface.blit(id_text, (drone.position.x + 5, drone.position.y - 10))
 
-        # Blit
+        # Blit to screen
         screen.blit(environment_surface, (0, 0))
 
         # Show stats
@@ -295,11 +333,9 @@ def main():
     environment.save_environment(drones)
     logging.info("Environment and drones saved on exit.")
 
-    if hasattr(weather_system, 'close_csv'):
-        weather_system.close_csv()
-
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     try:

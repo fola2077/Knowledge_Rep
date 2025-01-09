@@ -263,6 +263,18 @@ class Environment:
         # Placeholder for any dynamic environment updates
         pass
 
+    def reset(self):
+        """
+        Reset the environment to its initial state.
+        """
+        # Regenerate the grid and buildings
+        self.grid = self.generate_grid()
+        self.land_mask = self.grid > WATER_LEVEL
+        self.buildings = self.add_buildings()
+        self.print_grid_stats()
+        print("Environment has been reset.")
+        self.log_action("Environment Reset", "Reset to initial state.")
+
     def enable_editing(self):
         """
         Enable environment editing mode with a Pygame UI.
