@@ -61,18 +61,14 @@ class Drone:
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         drone_handler.setFormatter(formatter)
         self.logger.addHandler(drone_handler)
-        self.logger.propagate = False  # Prevent log messages from being duplicated in main.log
+        self.logger.propagate = False  
 
     def reset(self):
         # New attributes for tracking actions
         self.visited_cells.clear()
         self.detected_cells.clear()
         self.scan_mode = False
-        # self.detected_cells = set()
         self.time_since_last_detection = 0
-
-        # # Initialize oil_spillage to None
-        # self.oil_spillage = None
 
     def step(self, action, reward, done, next_state):
         """Store transition and train the agent."""
@@ -124,7 +120,6 @@ class Drone:
             with open(self.log_file, mode='a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow([timestamp, self.id, "Oil Detected", details])
-        # self.logger.info(f"{action} - {details}")
 
     def to_dict(self):
         """
@@ -152,14 +147,7 @@ class Drone:
         """
         Moves the drone by (dx, dy) while checking for collisions with other drones.
         """
-        # if self.is_returning:
-        #     # If returning, prioritize moving towards land
-        #     self.navigate_to_land()
-        #     return
-        # if self.on_land:
-        #     # Drone is on land; do not move until resuming mission
-        #     print(f"Drone {self.id} is on land and cannot move until weather improves.")
-        #     return
+
         
         # Calculate the movement vector scaled by speed
         direction = Vector2(dx, dy)
@@ -199,7 +187,6 @@ class Drone:
 
         if current_weather is None:
             print(f"Drone {self.id} has no current weather data.")
-            # self.log_action("Behavior Update Failed", "No current weather data")
             return
 
 
@@ -214,7 +201,6 @@ class Drone:
                 if distance <= neighbor_radius:
                     self.neighbors.append(drone)
         print(f"Drone {self.id} has {len(self.neighbors)} neighbors.")
-        # self.log_action("Neighbor Update", f"Found {len(self.neighbors)} neighbors")
 
     def share_information(self):
         if self.neighbors:
@@ -248,7 +234,7 @@ class Drone:
         cloud_density = current_weather.cloud_density
         weather_name = current_weather.name  # e.g. "Foggy", "Harmattan", "Sunny", "Stormy", etc.
 
-        # --- Convert Precipitation to Numeric ---
+        # --- Converts Precipitation to Numeric ---
         precip_map = {
             'None': 0,
             'Rain': 1,
@@ -258,7 +244,6 @@ class Drone:
         precip_value = precip_map.get(precipitation_type, 0)
 
         # --- Weighted Sum for Basic Factors ---
-        # Adjust these weights as needed
         w_wind = 0.3
         w_precip = 0.5
         w_cloud = 0.2
@@ -266,16 +251,11 @@ class Drone:
         raw_score = (w_wind * wind_speed) + (w_precip * precip_value) + (w_cloud * cloud_density)
 
         # --- Additional Penalties for Foggy / Harmattan ---
-        # We can interpret these as non-precipitation phenomena that hamper detection.
-        # E.g., Foggy => reduces visibility. Harmattan => dust haze.
-        # We'll just treat them as an extra additive penalty.
         if weather_name == "Foggy":
             # Fog can be pretty bad, especially if humidity is high
-            # Example: add 1.0 to raw_score
             raw_score += 1.0
         elif weather_name == "Harmattan":
             # Dust haze
-            # Example: add 1.5 if we want it worse than standard fog
             raw_score += 1.5
 
         # The higher the raw_score, the worse the weather.
@@ -295,7 +275,6 @@ class Drone:
         """
         raw_score = self.get_weather_penalty()
 
-        # We invert the sign so a higher raw_score => lower factor
         # factor = logistic(-a * (raw_score - b))
         # 'a' is slope, 'b' is offset
         a = 1.0  # slope
@@ -310,13 +289,6 @@ class Drone:
         Example: logistic or exponential approach 
         so that very low concentration yields a big penalty.
         """
-        # If the cell is nearly 0.0 concentration, the factor ~ 0.
-        # If near 1.0 concentration, factor ~ 1.0
-        # Let's do a simple exponential approach:
-        # factor = 1 - exp(-5 * oil_concentration)
-        # At concentration=0.1 => factor ~ 1 - e^-0.5 => ~0.39
-        # At concentration=0.5 => factor ~ 1 - e^-2.5 => ~0.92
-        # Just an example
         return 1.0 - math.exp(-5 * oil_concentration)
 
 
@@ -351,7 +323,6 @@ class Drone:
         thickness_factor = self.thickness_factor(detected_concentration)
 
         # Combine them multiplicatively 
-        # so that if either factor is small, final is small
         detection_probability = base_probability * weather_factor * thickness_factor
 
         # clamp to [0..1]
@@ -450,9 +421,7 @@ class Drone:
                 for dy in range(-detection_radius, detection_radius + 1):
                     gx = grid_x + dx
                     gy = grid_y + dy
-                    # # Skip current cell (marked)
-                    # if dx == 0 and dy == 0 :
-                    #     continue
+
                     if (0 <= gx < self.environment.grid_width and 
                         0 <= gy < self.environment.grid_height):
                         

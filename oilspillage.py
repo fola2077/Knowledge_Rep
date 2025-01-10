@@ -61,8 +61,8 @@ class OilSpill:
             [0.05, 0.1, 0.05]
         ])
 
-        # Adjust the kernel based on wind direction
-        # Shift the kernel in the direction of the wind
+        # Adjusts the kernel based on wind direction
+        # Shifting the kernel in the direction of the wind
         shift_x = int(round(wind_dx))
         shift_y = int(round(wind_dy))
         kernel = np.roll(base_kernel, shift=shift_x, axis=1)
@@ -210,7 +210,7 @@ class OilSpillage:
         Spawn new spills at random locations on water.
         """
         if num_spills is None:
-            num_spills = random.randint(5, 9)  # Default behavior
+            num_spills = random.randint(5, 9)  # Default 
 
         current_time_minutes = self.time_manager.get_current_total_minutes()
         
@@ -348,13 +348,6 @@ class OilSpillage:
 
     def all_spills_detected(self):
         """Check if all active spills have been detected."""
-        # Filter out removed spills, as they are no longer active
-        # active_spills = [spill for spill in self.spills if spill.status != 'removed']
-        # if not active_spills:
-        #     print("No active spills remaining.")
-        #     return True  # Continue the episode if no active spills (depends on your desired behavior)
-        # # Return True only if all active spills have been detected
-        # return all(spill.detected for spill in active_spills)
         return False
 
     def get_cell_concentration(self, position):
@@ -375,7 +368,7 @@ class OilSpillage:
             total_concentration = min(total_concentration, 1.0)
             return total_concentration
         else:
-            # If position is out of bounds, return zero concentration
+            # If position is out of bounds, returns zero concentration
             return 0.0
     
     def get_time_since_spill(self, position):

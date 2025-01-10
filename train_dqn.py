@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 import torch
 import random
-from simulation_env import DroneEnv
+from policy import DroneEnv
 from drone import Drone
 from dqn_agent import DQNAgent
 import matplotlib.pyplot as plt
@@ -164,4 +164,4 @@ def plot_trajectories(all_positions, num_drones, num_episodes_to_plot=5):
         plt.show()
 
 if __name__ == "__main__":
-    train(num_episodes=100, num_drones=3, target_update=10)
+    train(num_episodes=110, num_drones=3, target_update=10)

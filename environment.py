@@ -33,8 +33,8 @@ class Environment:
         self.num_islands = num_islands
         self.max_radius = max_radius
         self.num_buildings = num_buildings
-        self.cell_size = 10  # Ensure consistency with main.py
-        self.oil_spill = None  # Initialize with no oil spill
+        self.cell_size = 10 
+        self.oil_spill = None  
         self.oil_spillage_manager = None  
 
         # Set up a module-specific logger
@@ -52,7 +52,6 @@ class Environment:
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
         filename = os.path.join(current_dir, "environment.npy")
-        # loaded = self.load_environment(filename)  # Try reading environment.npy
         
                 # Use the load_from_file parameter
         if load_from_file:
@@ -87,7 +86,7 @@ class Environment:
                         if distance < radius:
                             grid[x, y] += random.uniform(0.5, 1.0)
 
-        # Force some land for testing
+        # Forces some land for testing
         for i in range(10):
             if i < self.grid_width and i < self.grid_height:
                 grid[i, i] = WATER_LEVEL + 0.5  # Ensure these cells are land
@@ -144,7 +143,6 @@ class Environment:
     def load_environment(self, filename='environment.npy'):
             environment_data = np.load(filename, allow_pickle=True).item()
 
-            # Assign loaded data to instance attributes
             self.grid = environment_data.get('grid', self.generate_grid())
             self.land_mask = self.grid > WATER_LEVEL  # Define land_mask
             self.buildings = environment_data.get('buildings', self.add_buildings())
@@ -153,7 +151,7 @@ class Environment:
             print(f"Environment loaded from '{filename}'.")
             self.log_action("Environment Loaded", f"Loaded from '{filename}'")
             self.print_grid_stats()
-            return environment_data  # Return full data for main.py to handle drones
+            return environment_data  
 
     def set_oil_spillage_manager(self, oil_spillage_manager):
         self.oil_spillage_manager = oil_spillage_manager
@@ -213,7 +211,7 @@ class Environment:
                 else:
                     pygame.draw.rect(screen, WATER_COLOR, rect)
 
-        # Optionally, draw grid lines for better visualization
+
         for x in range(self.grid_width + 1):
             pygame.draw.line(
                 screen, 
@@ -236,7 +234,6 @@ class Environment:
         Parameters:
             event : Pygame event to handle.
         """
-        # Only handle events when running as a standalone script
         if hasattr(self, 'editing') and self.editing:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -260,7 +257,6 @@ class Environment:
         """
         Update environment-related states if necessary.
         """
-        # Placeholder for any dynamic environment updates
         pass
 
     def reset(self):

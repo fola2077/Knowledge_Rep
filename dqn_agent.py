@@ -25,11 +25,8 @@ class ReplayBuffer:
         self.buffer.append(Transition(state, action, reward, next_state, done))
     
     def sample(self, batch_size):
-        # batch = random.sample(self.buffer, batch_size)
-        # state, action, reward, next_state, done = map(np.stack, zip(*batch))
-        # return state, action, reward, next_state, done
         transitions = random.sample(self.buffer, batch_size)
-        return transitions  # Return the transitions directly
+        return transitions  # Returns the transitions directly
     
     def __len__(self):
         return len(self.buffer)
