@@ -1,4 +1,4 @@
-# train_dqn.py 
+# TRAIN_DQN.PY
 import sys
 import numpy as np
 import seaborn as sns
@@ -12,7 +12,7 @@ from collections import deque
 from tqdm import tqdm  # Import tqdm for the progress bar
 import os
 
-def train(num_episodes=1000, num_drones=1, target_update=10, checkpoint_interval=10, checkpoint_path='checkpoint3.pth.tar'):
+def train(num_episodes=1000, num_drones=1, target_update=10, checkpoint_interval=10, checkpoint_path='checkpoint6.pth.tar'):
     env = DroneEnv(num_drones=num_drones)
     state_dim = env.observation_space
     action_dim = env.action_space
@@ -164,4 +164,4 @@ def plot_trajectories(all_positions, num_drones, num_episodes_to_plot=5):
         plt.show()
 
 if __name__ == "__main__":
-    train(num_episodes=110, num_drones=3, target_update=10)
+    train(num_episodes=100, num_drones=3, target_update=10)

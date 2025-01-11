@@ -1,4 +1,4 @@
-# policy.py
+# POLICY.PY
 
 import pygame
 import sys
@@ -13,24 +13,24 @@ from oilspillage import OilSpillage
 from config import WIDTH, HEIGHT, CELL_SIZE
 
 class DroneEnv:
-    def __init__(self, num_drones=5, max_steps=1000):
+    def __init__(self, num_drones=5, max_steps=2000):
 
         # **Initialize environment parameters**
 
         self.num_drones = num_drones
         self.max_steps = max_steps
-        self.min_steps = 100
+        self.min_steps = 500
         self.current_step = 0
 
-        # **STATES: Initialize the environment and its components (environment, time, weather, oil spillage)**
+        # **STATES: Initializes the environment and its components (environment, time, weather, oil spillage)**
 
         self.environment = Environment()
-        self.time_manager = TimeManager()
+        self.time_manager = TimeManager(initial_season="Dry")
         self.weather_system = WeatherSystem(self.time_manager)
         self.oil_spillage = OilSpillage(self.environment, self.time_manager)
         self.environment.set_oil_spillage_manager(self.oil_spillage)
 
-        # **STATES: Initialize drones with their positions and load them into the environment**
+        # **STATES: Initializes drones with their positions and load them into the environment**
 
         self.drones = [
             Drone(id=i, position=(random.uniform(0, WIDTH), random.uniform(0, HEIGHT)),

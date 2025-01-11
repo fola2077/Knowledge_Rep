@@ -1,4 +1,4 @@
-# Weather Class
+# WEATHER AND TIME MANAGER CLASS
 import logging
 import pygame
 import random
@@ -39,11 +39,12 @@ SEASONS = ["Rainy", "Dry"]
 # Time Management
 class TimeManager:
     """Manages the simulation's time system."""
-    def __init__(self):
+    def __init__(self, initial_season="Dry"):
         self.hour = 6  # Start at 6 AM
         self.minute = 0
         self.day_duration = 24  # Hours in a day
-        self.season = "Rainy"  # Start with Rainy season
+        self.initial_season = initial_season
+        self.season = self.initial_season  # Can start with Rainy/Dry season
         self.season_duration = 30  # Days per season
         self.day_count = 0
         self.current_sim_time = 0.0  # Current simulation time in seconds
@@ -53,7 +54,7 @@ class TimeManager:
         self.hour = 6  # Start at 6 AM
         self.minute = 0
         self.day_duration = 24  # Hours in a day
-        self.season = "Rainy"  # Start with Rainy season
+        self.season = self.initial_season  # Can start with Rainy/Dry season
         self.season_duration = 30  # Days per season
         self.day_count = 0
         self.current_sim_time = 0.0  # Current simulation time in seconds

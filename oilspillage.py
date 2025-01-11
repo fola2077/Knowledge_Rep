@@ -1,4 +1,4 @@
-# oilspillage.py
+# OILSPILLAGE CLASS
 
 import numpy as np
 import random
@@ -18,6 +18,7 @@ class OilSpill:
         self.grid_width = environment.grid_width
         self.grid_height = environment.grid_height
         self.concentration = np.zeros((self.grid_width, self.grid_height), dtype=float)
+        self.origin_cells = initial_cells.copy()
         for (gx, gy) in initial_cells:
             self.concentration[gx, gy] = initial_concentration
         self.detected_concentration = np.zeros_like(self.concentration)
@@ -395,3 +396,20 @@ class OilSpillage:
             return None  # No spill at this position
         else:
             return min_time_since_spill
+        
+    def get_oil_concentration_grid(self):
+        """Returns the combined oil concentration grid from all active spills."""
+        w, h = self.environment.grid_width, self.environment.grid_height
+        total_concentration = np.zeros((w, h), dtype=float)
+        for spill in self.spills:
+            total_concentration += spill.concentration
+        # Ensure concentration values are between 0 and 1
+        total_concentration = np.clip(total_concentration, 0, 1)
+        return total_concentration
+    
+    def get_current_oil_spill_origins(self):
+        """Returns the origins of current active oil spills."""
+        origins = []
+        for spill in self.spills:
+            origins.extend(spill.origin_cells)
+        return origins
