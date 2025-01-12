@@ -34,7 +34,7 @@ Defines the `Drone` class, encapsulating drone-specific attributes and behaviors
 
 ### `environment.py`
 Models the simulation environment, including:
-- **Grid Representation**: A 200x200 grid representing land and water regions.
+- **Grid Representation**: A 1200x800 grid representing land and water regions.
 - **Dynamic Weather**: Updates weather conditions influencing visibility and spill spread.
 - **Oil Spill Generation**: Randomly initializes spills and simulates their spread based on wind and currents.
 
@@ -95,23 +95,6 @@ Simulates weather conditions impacting drone operations:
 - **Comprehensive Analysis**: Provides detailed metrics and visualizations for evaluation.
 
 ---
-
-## Contribution
-This project was developed by a group of three members:
-
-1. **Team Member 1**:
-   - Developed the `dqn_agent.py` and `train_dqn.py` for reinforcement learning implementation.
-   - Integrated neural network architecture and training strategies.
-
-2. **Team Member 2**:
-   - Designed `environment.py` and `oilspillage.py` for realistic simulation modeling.
-   - Implemented dynamic weather systems and spill propagation logic.
-
-3. **Team Member 3**:
-   - Created `analysis.py` for visualizing results and evaluating performance.
-   - Authored the project report, ensuring alignment with theoretical frameworks and detailed documentation, including deriving mathematical representations for the five modeling stages.
-  
-This module forms the backbone of the training process, ensuring the integration of theoretical principles into practical implementation.
 
 ### Training Script (train_dqn.py)
 The `train_dqn.py` script orchestrates the training process for the DQN model. Key features include:
