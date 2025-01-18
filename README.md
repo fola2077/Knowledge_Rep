@@ -118,7 +118,7 @@ This module provides tools for:
 
 For questions, feedback, or collaboration opportunities, please contact the team:
 
-- **Member 1**: Adegorite Micheal Fola — email@example.com
+- **Member 1**: Adegorite Michael Adefola — 24801131@stu.mmu.ac.uk
 - **Member 2**: Eluwande Olamiposi Samuel — 24776309@stu.mmu.ac.uk
 - **Member 3**: Ashamu Isaac Inioluwa — email@example.com
 
