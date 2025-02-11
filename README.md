@@ -1,4 +1,4 @@
-# README: Drone-Based Oil Spill Detection and Management Simulation
+# README: WEATHER-ADAPTIVE U.A.V SIMULATION FOR OIL SPILL DETECTION THROUGH DEEP Q LEARNING
 
 ## Project Overview
 This project simulates a multi-drone system for detecting and managing oil spills using reinforcement learning. The simulation integrates dynamic environmental conditions, weather systems, and collaborative drone actions to optimize spill detection. A Deep Q-Learning (DQN) approach is implemented to train drones for efficient exploration and detection, guided by a Sequential Decision Framework.
